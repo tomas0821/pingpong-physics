@@ -17,6 +17,13 @@ Traditional video analysis (like Tracker) requires manual frame-by-frame process
 *   `train.py`: The script used to train the model on the cluster (for reproducibility).
 *   `export_model.py`: Utility to optimize the model for CPU using OpenVINO.
 
+## 📦 Pre-trained Weights
+
+Pre-trained weights for YOLO11n optimized at 1024px resolution are available in the [Releases](https://github.com/tomas0821/pingpong-physics/releases/tag/v1.0.0) section.
+*   **PyTorch (`.pt`)**: Best for standard use.
+*   **OpenVINO**: Recommended for high FPS on Intel-based laptops.
+*   **ONNX**: Universal format.
+
 ## 🛠️ Installation
 
 1. Clone the repository:
