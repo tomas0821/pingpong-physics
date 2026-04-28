@@ -1,0 +1,26 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Data and Models
+Ping-Pong-Detection-3/
+runs/
+*.pt
+*.onnx
+*.xml
+*.bin
+best_openvino_model/
+
+# API Keys
+ROBOFLOW_API_KEY
+
+# Logs
+*.log
+*.err
+pingpong_data.csv
+
+# Environments
+.venv/
+env/
+venv/
