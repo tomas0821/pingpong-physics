@@ -10,8 +10,8 @@ import os
 
 # ---------------- Configuration ----------------
 SCALE_LENGTH_CM = 10.0
-# DEFAULT_MODEL = "runs/detect/train/weights/best_openvino_model/" # OpenVINO for CPU speed
-DEFAULT_MODEL = "runs/detect/train/weights/best.pt" 
+# Use OpenVINO folder if it exists, otherwise fallback to .pt
+DEFAULT_MODEL = "best_openvino_model" if os.path.exists("best_openvino_model") else "best.pt"
 CAMERA_INDEX = 0
 TARGET_WIDTH, TARGET_HEIGHT = 1280, 720 # Increased resolution for 1024px model
 TARGET_FPS = 60
@@ -159,8 +159,19 @@ def run_collisions(model_path):
             cv2.line(disp, r['start_sel'], r['end_sel'], (255, 255, 0), 2)
             cv2.putText(disp, f"V:{r['speed']:.1f}cm/s", (r['pos'][0]+15, r['pos'][1]), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
 
-        status = "Calibrar" if cm_per_pixel is None else ("MODO MEDICIÓN" if measurement_mode else "RASTREANDO")
-        cv2.putText(disp, f"S:{status} | Q:Exit S:Start P:Pause M:Measure R:Reset", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 2)
+        status = "CALIBRATE" if cm_per_pixel is None else ("MEASUREMENT MODE" if measurement_mode else "TRACKING")
+        cv2.putText(disp, f"S:{status} | Scale: {'OK' if cm_per_pixel else 'NO'} | S:Start P:Pause M:Measure R:Reset Q:Quit", (10, 30), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        
+        # Draw Calibration visuals if needed
+        if cm_per_pixel is None:
+            for pt in calibration_points:
+                cv2.circle(disp, pt, 5, (0, 0, 255), -1)
+            if len(calibration_points) == 1:
+                cv2.putText(disp, "Click second point for 10cm scale", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+            else:
+                cv2.putText(disp, "CALIBRATION REQUIRED: Click two points 10cm apart", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+        
         cv2.imshow("Collision Analyzer", disp)
 
         key = cv2.waitKey(1) & 0xFF
