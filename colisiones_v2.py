@@ -93,6 +93,8 @@ def plot_trajectory_data(history, start_idx, end_idx, ball_id):
     plt.figure(figsize=(8, 6))
     plt.subplot(211); plt.scatter(t, x); plt.plot(t, sx*t+ix, 'r', label=f'Vx={sx:.2f} (R2={rx**2:.2f})'); plt.legend(); plt.grid()
     plt.subplot(212); plt.scatter(t, y); plt.plot(t, sy*t+iy, 'g', label=f'Vy={sy:.2f} (R2={ry**2:.2f})'); plt.legend(); plt.grid()
+    plt.savefig('collision_vectors.pdf', bbox_inches='tight')
+    print("Manuscript figure saved as collision_vectors.pdf")
     plt.show()
 
 def match_detections(detections, last1, last2):

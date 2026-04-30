@@ -83,7 +83,10 @@ def plot_pendulum_data(history, avg_period):
     except: pass
 
     plt.plot(t, np.degrees(theta), 'b.', label='Data', markersize=2)
-    plt.title('Pendulum: Angle vs Time'); plt.grid(); plt.legend(); plt.show()
+    plt.title('Pendulum: Angle vs Time'); plt.grid(); plt.legend()
+    plt.savefig('pendulum_fit.pdf', bbox_inches='tight')
+    print("Manuscript figure saved as pendulum_fit.pdf")
+    plt.show()
 
 def run_pendulum(model_path):
     global tracking_active, is_paused, pivot_point, cm_per_pixel, calibration_points
