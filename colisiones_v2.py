@@ -1,3 +1,5 @@
+import os
+os.environ['ULTRALYTICS_GIT_CHECK'] = 'false'
 import cv2
 from ultralytics import YOLO
 import numpy as np
@@ -121,7 +123,7 @@ def match_detections(detections, last1, last2):
 
 def run_collisions(model_path):
     global tracking_active, is_paused, measurement_mode, selection_points, measurement_result, cm_per_pixel, last_pos_1, last_pos_2
-    model = YOLO(model_path)
+    model = YOLO(model_path, task='detect')
     cap = cv2.VideoCapture(CAMERA_INDEX)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, TARGET_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, TARGET_HEIGHT)
@@ -137,7 +139,7 @@ def run_collisions(model_path):
 
         if tracking_active and not is_paused:
             # Inference at 1024 for small ball precision
-            results = model(frame, conf=CONFIDENCE_THRESHOLD, verbose=False, imgsz=640)
+            results = model(frame, conf=CONFIDENCE_THRESHOLD, verbose=False, imgsz=1024)
             dets = [(int((b.xyxy[0][0]+b.xyxy[0][2])/2), int((b.xyxy[0][1]+b.xyxy[0][3])/2), int(b.xyxy[0][2]-b.xyxy[0][0])) for b in results[0].boxes]
             m1, m2 = match_detections(dets, last_pos_1, last_pos_2)
             

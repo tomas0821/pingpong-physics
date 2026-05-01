@@ -1,3 +1,5 @@
+import os
+os.environ['ULTRALYTICS_GIT_CHECK'] = 'false'
 import cv2
 import time
 import csv
@@ -31,7 +33,7 @@ def run_tracking(model_path, output_csv):
     global tracking_active, cm_per_pixel, calibration_points
     
     try:
-        model = YOLO(model_path)
+        model = YOLO(model_path, task='detect')
     except Exception as e:
         print(f"Error loading model: {e}")
         return
@@ -62,7 +64,7 @@ def run_tracking(model_path, output_csv):
             current_time = time.time()
 
             if tracking_active:
-                results = model.track(frame, persist=True, verbose=False, imgsz=640)
+                results = model.track(frame, persist=True, verbose=False, imgsz=1024)
                 if results and results[0].boxes:
                     for box in results[0].boxes:
                         x, y, w, h = box.xywh[0]

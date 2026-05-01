@@ -1,3 +1,5 @@
+import os
+os.environ['ULTRALYTICS_GIT_CHECK'] = 'false'
 import cv2
 from ultralytics import YOLO
 import numpy as np
@@ -90,7 +92,7 @@ def plot_pendulum_data(history, avg_period):
 
 def run_pendulum(model_path):
     global tracking_active, is_paused, pivot_point, cm_per_pixel, calibration_points
-    model = YOLO(model_path)
+    model = YOLO(model_path, task='detect')
     cap = cv2.VideoCapture(CAMERA_INDEX)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, TARGET_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, TARGET_HEIGHT)
@@ -107,7 +109,7 @@ def run_pendulum(model_path):
 
         if tracking_active and not is_paused and pivot_point:
             # Inference at 1024px for tiny ball accuracy
-            results = model(frame, conf=CONFIDENCE_THRESHOLD, verbose=False, imgsz=640)
+            results = model(frame, conf=CONFIDENCE_THRESHOLD, verbose=False, imgsz=1024)
             if results and results[0].boxes:
                 best = max(results[0].boxes, key=lambda b: b.conf[0])
                 box = best.xyxy[0]
