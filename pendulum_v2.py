@@ -107,7 +107,7 @@ def run_pendulum(model_path):
 
         if tracking_active and not is_paused and pivot_point:
             # Inference at 1024px for tiny ball accuracy
-            results = model(frame, conf=CONFIDENCE_THRESHOLD, verbose=False, imgsz=1024)
+            results = model(frame, conf=CONFIDENCE_THRESHOLD, verbose=False, imgsz=640)
             if results and results[0].boxes:
                 best = max(results[0].boxes, key=lambda b: b.conf[0])
                 box = best.xyxy[0]

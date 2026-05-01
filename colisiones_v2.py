@@ -137,7 +137,7 @@ def run_collisions(model_path):
 
         if tracking_active and not is_paused:
             # Inference at 1024 for small ball precision
-            results = model(frame, conf=CONFIDENCE_THRESHOLD, verbose=False, imgsz=1024)
+            results = model(frame, conf=CONFIDENCE_THRESHOLD, verbose=False, imgsz=640)
             dets = [(int((b.xyxy[0][0]+b.xyxy[0][2])/2), int((b.xyxy[0][1]+b.xyxy[0][3])/2), int(b.xyxy[0][2]-b.xyxy[0][0])) for b in results[0].boxes]
             m1, m2 = match_detections(dets, last_pos_1, last_pos_2)
             

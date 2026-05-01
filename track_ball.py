@@ -62,7 +62,7 @@ def run_tracking(model_path, output_csv):
             current_time = time.time()
 
             if tracking_active:
-                results = model.track(frame, persist=True, verbose=False, imgsz=1024)
+                results = model.track(frame, persist=True, verbose=False, imgsz=640)
                 if results and results[0].boxes:
                     for box in results[0].boxes:
                         x, y, w, h = box.xywh[0]
