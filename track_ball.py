@@ -8,8 +8,8 @@ import os
 from utils import PerspectiveCalibration
 
 # --- Configuration ---
-DEFAULT_CALIB_WIDTH = 20.0
-DEFAULT_CALIB_HEIGHT = 20.0
+DEFAULT_CALIB_WIDTH = 40.0
+DEFAULT_CALIB_HEIGHT = 40.0
 DEFAULT_MODEL = "best_openvino_model" if os.path.exists("best_openvino_model") else "best.pt"
 
 # --- State Variables ---

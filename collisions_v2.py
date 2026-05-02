@@ -18,7 +18,7 @@ TARGET_WIDTH, TARGET_HEIGHT = 1280, 720
 CONFIDENCE_THRESHOLD = 0.6
 POINT_HISTORY_LENGTH = 200 
 MATCHING_MAX_DISTANCE_PX = 150
-CLICK_SELECTION_THRESHOLD_PX = 30 
+CLICK_SELECTION_THRESHOLD_PX = 50 
 
 # --- State Variables ---
 calib = PerspectiveCalibration(DEFAULT_CALIB_WIDTH, DEFAULT_CALIB_HEIGHT)
@@ -45,23 +45,29 @@ def onMouse(event, x, y, flags, param):
         click_pos = (x, y)
         closest = find_closest_point(click_pos, point_history_1, point_history_2)
         if closest:
-            selection_points.append(closest)
+            # If it's the second point and different ball, replace the first
+            if len(selection_points) == 1 and closest['ball_id'] != selection_points[0]['ball_id']:
+                selection_points = [closest]
+                print(f"Switched to Ball {closest['ball_id']}")
+            else:
+                selection_points.append(closest)
+                print(f"Point {len(selection_points)} selected for Ball {closest['ball_id']}")
+
             if len(selection_points) == 2:
-                if selection_points[0]['ball_id'] == selection_points[1]['ball_id']:
-                    s, e = (selection_points[0], selection_points[1]) if selection_points[0]['index'] < selection_points[1]['index'] else (selection_points[1], selection_points[0])
-                    history = point_history_1 if s['ball_id'] == 1 else point_history_2
-                    v = calculate_average_velocity(history, s['index'], e['index'])
-                    if v:
-                        res = {'vel': v, 'pos_px': e['pos_px'], 'start_px': s['pos_px'], 'end_px': e['pos_px'], 'ball_id': s['ball_id']}
-                        velocity_results.append(res)
-                        plot_trajectory_data(history, s['index'], e['index'], s['ball_id'])
-                        
-                        if len(velocity_results) >= 2:
-                            v1 = velocity_results[-2]
-                            v2 = velocity_results[-1]
-                            if v1['ball_id'] == v2['ball_id']:
-                                e_val = np.linalg.norm(v2['vel']) / np.linalg.norm(v1['vel'])
-                                print(f"Coefficient of Restitution (Estimated): {e_val:.3f}")
+                s, e = (selection_points[0], selection_points[1]) if selection_points[0]['index'] < selection_points[1]['index'] else (selection_points[1], selection_points[0])
+                history = point_history_1 if s['ball_id'] == 1 else point_history_2
+                v = calculate_average_velocity(history, s['index'], e['index'])
+                if v is not None:
+                    res = {'vel': v, 'pos_px': e['pos_px'], 'start_px': s['pos_px'], 'end_px': e['pos_px'], 'ball_id': s['ball_id']}
+                    velocity_results.append(res)
+                    plot_trajectory_data(history, s['index'], e['index'], s['ball_id'])
+                    
+                    if len(velocity_results) >= 2:
+                        v1 = velocity_results[-2]
+                        v2 = velocity_results[-1]
+                        if v1['ball_id'] == v2['ball_id']:
+                            e_val = np.linalg.norm(v2['vel']) / np.linalg.norm(v1['vel'])
+                            print(f"Coefficient of Restitution (Estimated): {e_val:.3f}")
                 selection_points = []
 
 def distance_px(p1, p2):
@@ -137,7 +143,6 @@ def run_collisions(model_path):
         draw_centers = {}
 
         if tracking_active and not is_paused and calib.is_calibrated():
-            # Using 1024 as per latest model re-export
             results = model(frame, conf=CONFIDENCE_THRESHOLD, verbose=False, imgsz=1024)
             dets = [(int((b.xyxy[0][0]+b.xyxy[0][2])/2), int((b.xyxy[0][1]+b.xyxy[0][3])/2), int(b.xyxy[0][2]-b.xyxy[0][0])) for b in results[0].boxes]
             m1, m2 = match_detections(dets, last_pos_px_1, last_pos_px_2)
@@ -166,11 +171,19 @@ def run_collisions(model_path):
             speed = np.linalg.norm(res['vel'])
             cv2.putText(disp, f"V:{speed:.1f}cm/s", (res['pos_px'][0]+15, res['pos_px'][1]), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
 
+        # Draw pending selection points
+        for sel in selection_points:
+            cv2.circle(disp, sel['pos_px'], 7, (0, 255, 255), -1)
+
         status = "CALIBRATE" if not calib.is_calibrated() else ("MEASUREMENT MODE" if measurement_mode else "TRACKING")
-        cv2.putText(disp, f"S:{status} | S:Start P:Pause M:Measure R:Reset Q:Quit", (10, 30), 
+        cv2.putText(disp, f"S:{status} | S:Start P:Pause M:Measure C:Clear Meas R:Reset Q:Quit", (10, 30), 
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
         
         calib.draw_info(disp)
+        if calib.is_calibrated() and not tracking_active:
+            cv2.putText(disp, "Check the green grid. If distorted, press 'R' to re-calibrate.", (10, 60), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
         cv2.imshow("Collision Analyzer", disp)
 
         key = cv2.waitKey(1) & 0xFF
@@ -178,6 +191,10 @@ def run_collisions(model_path):
         elif key == ord('s'): tracking_active = not tracking_active
         elif key == ord('m'): measurement_mode = not measurement_mode if is_paused else False
         elif key == ord('p'): is_paused = not is_paused
+        elif key == ord('c'): # New key to clear measurements only
+            velocity_results = []
+            selection_points = []
+            print("Measurements cleared.")
         elif key == ord('r'): 
             point_history_1.clear(); point_history_2.clear(); last_pos_px_1 = None; last_pos_px_2 = None; calib.reset(); velocity_results = []
 
