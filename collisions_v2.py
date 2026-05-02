@@ -11,7 +11,7 @@ from utils import PerspectiveCalibration, calculate_restitution
 
 # ---------------- Configuration ----------------
 DEFAULT_CALIB_WIDTH = 40.0
-DEFAULT_CALIB_HEIGHT = 40.0
+DEFAULT_CALIB_HEIGHT = 20.0
 DEFAULT_MODEL = "best_openvino_model" if os.path.exists("best_openvino_model") else "best.pt"
 CAMERA_INDEX = 0
 TARGET_WIDTH, TARGET_HEIGHT = 1280, 720
