@@ -11,7 +11,7 @@ Traditional video analysis (like Tracker) requires manual frame-by-frame process
 
 ## 📁 Repository Structure
 
-*   `colisiones_v2.py`: Multi-ball tracking for momentum and collision experiments.
+*   `collisions_v2.py`: Multi-ball tracking for momentum and collision experiments.
 *   `pendulum_v2.py`: Interactive pendulum analyzer with damped oscillation fitting.
 *   `track_ball.py`: General-purpose coordinate logger (logs to CSV for post-processing).
 *   `train.py`: The script used to train the model on the cluster (for reproducibility).
@@ -45,7 +45,7 @@ Pre-trained weights for YOLO11n optimized at 1024px resolution are available in 
 ## 📈 Experiments
 
 ### 1. Collisions & Momentum
-Run `python colisiones_v2.py`. 
+Run `python collisions_v2.py`. 
 *   **Calibration**: Click the two ends of a 10cm reference object.
 *   **Physics**: The script calculates $V_x$ and $V_y$ using linear regression on trajectory segments.
 *   **Suggested Figure**: *Screenshot of the "Collision Analyzer" window showing two intersecting trajectories with their respective velocity vectors.*
