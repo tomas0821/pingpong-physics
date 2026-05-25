@@ -25,6 +25,7 @@ calib = PerspectiveCalibration(DEFAULT_CALIB_WIDTH, DEFAULT_CALIB_HEIGHT)
 tracking_active = False
 is_paused = False
 measurement_mode = False 
+momentum_mode = False # New state for momentum analysis
 selection_points = [] 
 velocity_results = [] 
 
@@ -35,17 +36,17 @@ point_history_2 = deque(maxlen=POINT_HISTORY_LENGTH)
 last_pos_px_2 = None
 
 def onMouse(event, x, y, flags, param):
-    global calib, selection_points, velocity_results
+    global calib, selection_points, velocity_results, momentum_mode
     if not calib.is_calibrated():
         if event == cv2.EVENT_LBUTTONDOWN:
             calib.add_point(x, y)
         return
 
-    if measurement_mode and event == cv2.EVENT_LBUTTONDOWN:
+    if (measurement_mode or momentum_mode) and event == cv2.EVENT_LBUTTONDOWN:
         click_pos = (x, y)
         closest = find_closest_point(click_pos, point_history_1, point_history_2)
         if closest:
-            # If it's the second point and different ball, replace the first
+            # Check if we are selecting the second point for the same ball
             if len(selection_points) == 1 and closest['ball_id'] != selection_points[0]['ball_id']:
                 selection_points = [closest]
                 print(f"Switched to Ball {closest['ball_id']}")
@@ -62,12 +63,31 @@ def onMouse(event, x, y, flags, param):
                     velocity_results.append(res)
                     plot_trajectory_data(history, s['index'], e['index'], s['ball_id'])
                     
-                    if len(velocity_results) >= 2:
-                        v1 = velocity_results[-2]
-                        v2 = velocity_results[-1]
-                        if v1['ball_id'] == v2['ball_id']:
-                            e_val = np.linalg.norm(v2['vel']) / np.linalg.norm(v1['vel'])
-                            print(f"Coefficient of Restitution (Estimated): {e_val:.3f}")
+                    if momentum_mode:
+                        if len(velocity_results) == 4:
+                            # Assuming order: B1_initial, B2_initial, B1_final, B2_final
+                            v1_i, v2_i = velocity_results[0]['vel'], velocity_results[1]['vel']
+                            v1_f, v2_f = velocity_results[2]['vel'], velocity_results[3]['vel']
+                            
+                            p_initial = v1_i + v2_i
+                            p_final = v1_f + v2_f
+                            
+                            mag_i = np.linalg.norm(p_initial)
+                            mag_f = np.linalg.norm(p_final)
+                            preservation = (mag_f / mag_i * 100) if mag_i > 0 else 0
+                            
+                            print("\n--- Momentum Conservation Analysis ---")
+                            print(f"Total Initial Velocity Vector (P/m): {p_initial}")
+                            print(f"Total Final Velocity Vector (P/m):   {p_final}")
+                            print(f"Momentum Preserved: {preservation:.1f}%")
+                            print("--------------------------------------\n")
+                    else:
+                        if len(velocity_results) >= 2:
+                            v1 = velocity_results[-2]
+                            v2 = velocity_results[-1]
+                            if v1['ball_id'] == v2['ball_id']:
+                                e_val = np.linalg.norm(v2['vel']) / np.linalg.norm(v1['vel'])
+                                print(f"Coefficient of Restitution (Estimated): {e_val:.3f}")
                 selection_points = []
 
 def distance_px(p1, p2):
@@ -127,7 +147,7 @@ def match_detections(detections, last1_px, last2_px):
     return d1, d2
 
 def run_collisions(model_path):
-    global tracking_active, is_paused, measurement_mode, selection_points, velocity_results, calib, last_pos_px_1, last_pos_px_2
+    global tracking_active, is_paused, measurement_mode, momentum_mode, selection_points, velocity_results, calib, last_pos_px_1, last_pos_px_2
     model = YOLO(model_path)
     cap = cv2.VideoCapture(CAMERA_INDEX)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, TARGET_WIDTH)
@@ -175,8 +195,8 @@ def run_collisions(model_path):
         for sel in selection_points:
             cv2.circle(disp, sel['pos_px'], 7, (0, 255, 255), -1)
 
-        status = "CALIBRATE" if not calib.is_calibrated() else ("MEASUREMENT MODE" if measurement_mode else "TRACKING")
-        cv2.putText(disp, f"S:{status} | S:Start P:Pause M:Measure C:Clear Meas R:Reset Q:Quit", (10, 30), 
+        status = "CALIBRATE" if not calib.is_calibrated() else ("MOMENTUM MODE" if momentum_mode else ("MEASUREMENT MODE" if measurement_mode else "TRACKING"))
+        cv2.putText(disp, f"S:{status} | S:Start P:Pause M:Measure K:Momentum C:Clear R:Reset Q:Quit", (10, 30), 
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
         
         calib.draw_info(disp)
@@ -189,7 +209,16 @@ def run_collisions(model_path):
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'): break
         elif key == ord('s'): tracking_active = not tracking_active
-        elif key == ord('m'): measurement_mode = not measurement_mode if is_paused else False
+        elif key == ord('k'): # Toggle Momentum Mode
+            momentum_mode = not momentum_mode
+            measurement_mode = False
+            if momentum_mode: is_paused = True
+            velocity_results = []
+            print(f"Momentum Mode {'ON' if momentum_mode else 'OFF'}. Please select 4 segments in order: B1_initial, B2_initial, B1_final, B2_final.")
+        elif key == ord('m'): 
+            measurement_mode = not measurement_mode
+            momentum_mode = False
+            if measurement_mode: is_paused = True 
         elif key == ord('p'): is_paused = not is_paused
         elif key == ord('c'): # New key to clear measurements only
             velocity_results = []

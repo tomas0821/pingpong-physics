@@ -20,6 +20,9 @@ ROBOFLOW_API_KEY
 *.err
 pingpong_data.csv
 
+# Claude Code
+CLAUDE.md
+
 # Environments
 .venv/
 env/
