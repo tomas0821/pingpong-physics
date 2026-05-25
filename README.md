@@ -19,6 +19,8 @@ Traditional video analysis (like Tracker) requires manual frame-by-frame process
 | `pendulo_v2.py` | Spanish | Same as above |
 | `pendulum_energy.py` | English | Energy conservation — live KE/PE readout and g measurement |
 | `pendulo_energia.py` | Spanish | Same as above |
+| `pendulum_period.py` | English | Period vs. length — T² vs L linear fit and g extraction |
+| `pendulo_periodo.py` | Spanish | Same as above |
 | `track_ball.py` | English | General-purpose coordinate logger (CSV output for post-processing) |
 | `train.py` | — | Model training script (for reproducibility, runs on GPU cluster) |
 | `export_model.py` | — | Exports trained weights to OpenVINO and ONNX formats |
@@ -50,12 +52,12 @@ Pre-trained weights for YOLO11n optimized at 1024px resolution are available in 
 
 ## 📈 Experiments
 
-All experiments share the same workflow: **calibrate** (click 4 corners of a known reference area) → **set up** → press **S** to start tracking → press **P** to pause → press **G** to generate the plot.
+All experiments share the same calibration workflow: click 4 corners of a known reference area to establish the pixel→cm mapping, then set up the experiment and press **S** to start.
 
 ### 1. Collisions & Momentum
 Run `python collisions_v2.py` (or `colisiones_v2.py` for Spanish).
 *   **Calibration**: Click the 4 corners of a known reference area (default 40×20 cm).
-*   **Physics**: Calculates $V_x$ and $V_y$ via linear regression on user-selected trajectory segments. Supports coefficient of restitution mode (press **M**) and momentum conservation mode (press **K**).
+*   **Physics**: Calculates $V_x$ and $V_y$ via linear regression on user-selected trajectory segments. Supports coefficient of restitution mode (**M**) and momentum conservation mode (**K**).
 *   **Output**: `vectores_colision.pdf` with position vs. time plots and velocity fits.
 
 ### 2. Damped Harmonic Motion
@@ -68,17 +70,25 @@ Run `python pendulum_v2.py` (or `pendulo_v2.py` for Spanish).
 ### 3. Energy Conservation
 Run `python pendulum_energy.py` (or `pendulo_energia.py` for Spanish).
 *   **Setup**: Calibrate, then click to set the pivot point.
-*   **Live readout**: Linear speed $v$ (cm/s), height $h$ (cm), KE/m, PE/m, and % energy retained overlaid on the video.
+*   **Live readout**: Linear speed $v$ (cm/s), height $h$ (cm), KE/m, PE/m, and % energy retained.
 *   **Physics**: Press **G** while paused to generate a 3-panel plot:
     1. KE/m, PE/m, and total E/m vs. time.
     2. Energy retention E(t)/E₀ (%) with per-swing markers.
-    3. Gravitational acceleration $g$ extracted per half-swing via $g = v_\text{bottom}^2 / (2h_\text{top})$, compared against the theoretical 9.81 m/s².
+    3. Gravitational acceleration $g$ extracted per half-swing via $g = v_\text{bottom}^2 / (2h_\text{top})$, compared against 9.81 m/s².
 *   **Output**: `conservacion_energia.pdf` and console summary of measured $g$, % error, and energy loss per cycle.
+
+### 4. Period vs. Length
+Run `python pendulum_period.py` (or `pendulo_periodo.py` for Spanish).
+*   **Setup**: Calibrate, then click to set the pivot point.
+*   **Workflow**: Hang the pendulum at length $L_1$, press **S** — the script auto-locks $L$ from the first detections, counts 10 full cycles, stores the result, and stops. Change the string length and press **S** again. Repeat for 5–6 lengths.
+*   **Physics**: Press **G** (with ≥ 3 runs) to plot $T^2$ vs $L$. The slope gives $4\pi^2/g$:
+    $$g = \frac{4\pi^2}{\text{slope}}$$
+*   **Output**: `pendulum_period.pdf` (two-panel: $T^2$ vs $L$ with linear fit, and $T$ vs $L$ with theoretical curve) and a console results table. Use `--cycles N` to change the number of periods averaged per run.
 
 ## 🔬 Physics Education Context
 
 This tool is designed to bridge the gap between "Black Box" technology and fundamental physics.
-*   **Error Analysis**: Students can analyze how the coefficient of restitution changes with different surfaces, or compare their measured $g$ against the theoretical value.
+*   **Error Analysis**: Students can compare their measured $g$ across methods (energy conservation vs. period vs. length) and discuss sources of systematic error.
 *   **High Sampling Rate**: Reach up to 60–120 FPS, providing significantly more data points than manual video analysis.
 
 ## 📜 License
