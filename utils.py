@@ -60,13 +60,18 @@ class PerspectiveCalibration:
         self.matrix = None
         self.inv_matrix = None
 
-    def draw_info(self, frame):
+    def draw_info(self, frame, lang='en'):
         for pt in self.points:
             cv2.circle(frame, pt, 5, (0, 0, 255), -1)
-        
+
         if len(self.points) < 4:
-            cv2.putText(frame, f"Calibration: Click point {len(self.points)+1}/4 (Define {self.real_width}x{self.real_height}cm area)", 
-                        (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+            if lang == 'es':
+                msg = (f"Calibración: Haga clic en el punto {len(self.points)+1}/4"
+                       f" (Defina un área de {self.real_width}x{self.real_height}cm)")
+            else:
+                msg = (f"Calibration: Click point {len(self.points)+1}/4"
+                       f" (Define {self.real_width}x{self.real_height}cm area)")
+            cv2.putText(frame, msg, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
         else:
             self.draw_grid(frame)
 
