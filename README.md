@@ -11,11 +11,17 @@ Traditional video analysis (like Tracker) requires manual frame-by-frame process
 
 ## 📁 Repository Structure
 
-*   `colisiones_v2.py`: Multi-ball tracking for momentum and collision experiments.
-*   `pendulum_v2.py`: Interactive pendulum analyzer with damped oscillation fitting.
-*   `track_ball.py`: General-purpose coordinate logger (logs to CSV for post-processing).
-*   `train.py`: The script used to train the model on the cluster (for reproducibility).
-*   `export_model.py`: Utility to optimize the model for CPU using OpenVINO.
+| Script | Language | Experiment |
+|---|---|---|
+| `collisions_v2.py` | English | Multi-ball tracking for momentum and collision experiments |
+| `colisiones_v2.py` | Spanish | Same as above |
+| `pendulum_v2.py` | English | Damped oscillation fitting (θ vs t) |
+| `pendulo_v2.py` | Spanish | Same as above |
+| `pendulum_energy.py` | English | Energy conservation — live KE/PE readout and g measurement |
+| `pendulo_energia.py` | Spanish | Same as above |
+| `track_ball.py` | English | General-purpose coordinate logger (CSV output for post-processing) |
+| `train.py` | — | Model training script (for reproducibility, runs on GPU cluster) |
+| `export_model.py` | — | Exports trained weights to OpenVINO and ONNX formats |
 
 ## 📦 Pre-trained Weights
 
@@ -28,7 +34,7 @@ Pre-trained weights for YOLO11n optimized at 1024px resolution are available in 
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/[your-username]/pingpong-physics.git
+   git clone https://github.com/tomas0821/pingpong-physics.git
    cd pingpong-physics
    ```
 
@@ -44,24 +50,36 @@ Pre-trained weights for YOLO11n optimized at 1024px resolution are available in 
 
 ## 📈 Experiments
 
+All experiments share the same workflow: **calibrate** (click 4 corners of a known reference area) → **set up** → press **S** to start tracking → press **P** to pause → press **G** to generate the plot.
+
 ### 1. Collisions & Momentum
-Run `python colisiones_v2.py`. 
-*   **Calibration**: Click the two ends of a 10cm reference object.
-*   **Physics**: The script calculates $V_x$ and $V_y$ using linear regression on trajectory segments.
-*   **Suggested Figure**: *Screenshot of the "Collision Analyzer" window showing two intersecting trajectories with their respective velocity vectors.*
+Run `python collisions_v2.py` (or `colisiones_v2.py` for Spanish).
+*   **Calibration**: Click the 4 corners of a known reference area (default 40×20 cm).
+*   **Physics**: Calculates $V_x$ and $V_y$ via linear regression on user-selected trajectory segments. Supports coefficient of restitution mode (press **M**) and momentum conservation mode (press **K**).
+*   **Output**: `vectores_colision.pdf` with position vs. time plots and velocity fits.
 
 ### 2. Damped Harmonic Motion
-Run `python pendulum_v2.py`.
-*   **Setup**: Set the pivot point with a click.
-*   **Fitting**: Press 'G' while paused to fit the data to:
+Run `python pendulum_v2.py` (or `pendulo_v2.py` for Spanish).
+*   **Setup**: Calibrate, then click to set the pivot point.
+*   **Fitting**: Press **G** while paused to fit the angular data to:
     $$\theta(t) = A_0 e^{-\beta t} \cos(\omega t + \phi)$$
-*   **Suggested Figure**: *The generated Matplotlib plot showing the blue data points perfectly overlaid by the green damped-sine fit.*
+*   **Output**: `pendulo_ajuste.pdf` and console summary of $A_0$, $\beta$, $\omega$, $T$, $\phi$.
+
+### 3. Energy Conservation
+Run `python pendulum_energy.py` (or `pendulo_energia.py` for Spanish).
+*   **Setup**: Calibrate, then click to set the pivot point.
+*   **Live readout**: Linear speed $v$ (cm/s), height $h$ (cm), KE/m, PE/m, and % energy retained overlaid on the video.
+*   **Physics**: Press **G** while paused to generate a 3-panel plot:
+    1. KE/m, PE/m, and total E/m vs. time.
+    2. Energy retention E(t)/E₀ (%) with per-swing markers.
+    3. Gravitational acceleration $g$ extracted per half-swing via $g = v_\text{bottom}^2 / (2h_\text{top})$, compared against the theoretical 9.81 m/s².
+*   **Output**: `conservacion_energia.pdf` and console summary of measured $g$, % error, and energy loss per cycle.
 
 ## 🔬 Physics Education Context
 
 This tool is designed to bridge the gap between "Black Box" technology and fundamental physics.
-*   **Error Analysis**: Students can analyze how the coefficient of restitution changes with different surfaces.
-*   **High Sampling Rate**: Reach up to 60-120 FPS, providing significantly more data points than manual video analysis.
+*   **Error Analysis**: Students can analyze how the coefficient of restitution changes with different surfaces, or compare their measured $g$ against the theoretical value.
+*   **High Sampling Rate**: Reach up to 60–120 FPS, providing significantly more data points than manual video analysis.
 
 ## 📜 License
 MIT License
