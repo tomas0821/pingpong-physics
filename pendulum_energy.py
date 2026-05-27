@@ -7,11 +7,10 @@ import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 import argparse
 import os
-from utils import PerspectiveCalibration
+from utils import LineCalibration
 
 # ---------------- Configuration ----------------
-DEFAULT_CALIB_WIDTH = 40.0
-DEFAULT_CALIB_HEIGHT = 20.0
+DEFAULT_SCALE_CM = 30.0
 DEFAULT_MODEL = "best_openvino_model" if os.path.exists("best_openvino_model") else "best.pt"
 CAMERA_INDEX = 0
 TARGET_WIDTH, TARGET_HEIGHT = 1280, 720
@@ -21,7 +20,7 @@ G_CM_S2 = 981.0  # cm/s²
 VELOCITY_SMOOTH_WINDOW = 5  # frames used to smooth velocity estimate
 
 # --- State Variables ---
-calib = PerspectiveCalibration(DEFAULT_CALIB_WIDTH, DEFAULT_CALIB_HEIGHT)
+calib = LineCalibration(DEFAULT_SCALE_CM)
 pivot_point_px = None
 pivot_point_cm = None
 tracking_active = False

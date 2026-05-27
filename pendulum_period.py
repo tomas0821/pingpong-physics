@@ -8,11 +8,10 @@ import matplotlib.pyplot as plt
 from scipy.stats import linregress
 import argparse
 import os
-from utils import PerspectiveCalibration
+from utils import LineCalibration
 
 # ---------------- Configuration ----------------
-DEFAULT_CALIB_WIDTH = 40.0
-DEFAULT_CALIB_HEIGHT = 20.0
+DEFAULT_SCALE_CM = 30.0
 DEFAULT_MODEL = "best_openvino_model" if os.path.exists("best_openvino_model") else "best.pt"
 CAMERA_INDEX = 0
 TARGET_WIDTH, TARGET_HEIGHT = 1280, 720
@@ -22,7 +21,7 @@ TARGET_CYCLES = 10          # full periods to average per run
 L_LOCK_FRAMES = 10          # frames used to lock pendulum length
 
 # --- Global state ---
-calib = PerspectiveCalibration(DEFAULT_CALIB_WIDTH, DEFAULT_CALIB_HEIGHT)
+calib = LineCalibration(DEFAULT_SCALE_CM)
 pivot_point_px = None
 pivot_point_cm = None
 tracking_active = False

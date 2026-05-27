@@ -92,6 +92,57 @@ class PerspectiveCalibration:
             p4 = self.map_back(self.real_width, y_cm)
             cv2.line(frame, p3, p4, (0, 255, 0), 1)
 
+class LineCalibration:
+    """Two-click scale calibration: user marks both ends of a known-length reference."""
+    def __init__(self, known_length_cm=30.0):
+        self.points = []
+        self.known_length_cm = known_length_cm
+        self.scale = None  # cm per pixel
+
+    def add_point(self, x, y):
+        if len(self.points) < 2:
+            self.points.append((x, y))
+            if len(self.points) == 2:
+                self._compute_scale()
+                return True
+        return False
+
+    def _compute_scale(self):
+        p1, p2 = self.points
+        px_dist = np.sqrt((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2)
+        if px_dist > 0:
+            self.scale = self.known_length_cm / px_dist
+
+    def map_point(self, x, y):
+        if self.scale is None:
+            return None
+        return np.array([x * self.scale, y * self.scale])
+
+    def is_calibrated(self):
+        return self.scale is not None
+
+    def reset(self):
+        self.points = []
+        self.scale = None
+
+    def draw_info(self, frame, lang='en'):
+        for pt in self.points:
+            cv2.circle(frame, pt, 5, (0, 0, 255), -1)
+        if len(self.points) == 2:
+            cv2.line(frame, self.points[0], self.points[1], (0, 0, 255), 2)
+            mid = ((self.points[0][0] + self.points[1][0]) // 2,
+                   (self.points[0][1] + self.points[1][1]) // 2 - 10)
+            cv2.putText(frame, f"{self.known_length_cm:.0f} cm",
+                        mid, cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+        else:
+            n = len(self.points) + 1
+            if lang == 'es':
+                msg = f"Calibracion: Haga clic en el extremo {n}/2 de la referencia de {self.known_length_cm:.0f}cm"
+            else:
+                msg = f"Calibration: Click end {n}/2 of the {self.known_length_cm:.0f}cm reference"
+            cv2.putText(frame, msg, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+
+
 def calculate_restitution(v1, v2):
     rel_v_i = np.linalg.norm(v1)
     rel_v_f = np.linalg.norm(v2)
