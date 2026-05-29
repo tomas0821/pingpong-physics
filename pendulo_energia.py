@@ -194,8 +194,8 @@ def run_energy(model_path):
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, TARGET_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, TARGET_HEIGHT)
 
-    cv2.namedWindow("Conservación de Energía")
-    cv2.setMouseCallback("Conservación de Energía", onMouse)
+    cv2.namedWindow("Conservacion de Energia")
+    cv2.setMouseCallback("Conservacion de Energia", onMouse)
 
     while True:
         ret, frame = cap.read()
@@ -263,7 +263,7 @@ def run_energy(model_path):
                     (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
         calib.draw_info(disp, lang='es')
 
-        cv2.imshow("Conservación de Energía", disp)
+        cv2.imshow("Conservacion de Energia", disp)
 
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
