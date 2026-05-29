@@ -85,8 +85,19 @@ def compute_energy(pos_cm, t):
     if len(angle_history) < 4:
         return None
 
-    # Ajuste polinomial al historial de ángulos → derivada analítica = ω(t)
-    window = list(angle_history)[max(0, len(angle_history) - ANGLE_FIT_WINDOW):]
+    # Usar el segmento del medio arco actual: puntos desde el último cruce por
+    # cero del ángulo hasta ahora. Si aún no hay cruce, usar los últimos
+    # ANGLE_FIT_WINDOW puntos como respaldo.
+    all_pts = list(angle_history)
+    segment_start = 0
+    for i in range(len(all_pts) - 1, 0, -1):
+        if (all_pts[i][1] >= 0) != (all_pts[i - 1][1] >= 0):
+            segment_start = i
+            break
+    window = all_pts[segment_start:] if (len(all_pts) - segment_start) >= 4 \
+        else all_pts[max(0, len(all_pts) - ANGLE_FIT_WINDOW):]
+
+    # Ajuste polinomial al segmento → derivada analítica = ω(t)
     t_win = np.array([p[0] for p in window])
     a_win = np.array([p[1] for p in window])
     t0 = t_win[0]
