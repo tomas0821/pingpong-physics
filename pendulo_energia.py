@@ -212,7 +212,7 @@ def run_energy(model_path):
         det_px = None
 
         if tracking_active and not is_paused and pivot_point_cm is not None:
-            results = model(frame, conf=CONFIDENCE_THRESHOLD, verbose=False, imgsz=1024)
+            results = model(frame, conf=CONFIDENCE_THRESHOLD, verbose=False, imgsz=640)
             if results and results[0].boxes:
                 best = max(results[0].boxes, key=lambda b: b.conf[0])
                 box = best.xyxy[0]
