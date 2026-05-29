@@ -73,14 +73,21 @@ def compute_energy(pos_cm, t):
     h_cm = max(0.0, lowest_y - pos_cm[1])
 
     # Linear velocity via finite differences over a smoothing window
+    # Average frame-to-frame speeds (not net displacement) so direction reversals
+    # inside the window don't cancel out velocity near the turning points.
     window = list(energy_history)[max(0, len(energy_history) - VELOCITY_SMOOTH_WINDOW):]
-    p0_cm, t0 = window[0][0], window[0][1]
-    dt = t - t0
-    if dt < 1e-6:
+    if len(window) < 2:
         return None
-    dx = pos_cm[0] - p0_cm[0]
-    dy = pos_cm[1] - p0_cm[1]
-    v = np.sqrt(dx**2 + dy**2) / dt  # cm/s
+    speeds = []
+    for i in range(1, len(window)):
+        p_prev, t_prev = window[i-1][0], window[i-1][1]
+        p_curr, t_curr = window[i][0], window[i][1]
+        dt_i = t_curr - t_prev
+        if dt_i > 1e-6:
+            speeds.append(float(np.linalg.norm(p_curr - p_prev) / dt_i))
+    if not speeds:
+        return None
+    v = float(np.mean(speeds))  # cm/s
 
     ke = 0.5 * v**2
     pe = G_CM_S2 * h_cm
