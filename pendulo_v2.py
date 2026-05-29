@@ -114,8 +114,8 @@ def run_pendulum(model_path):
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, TARGET_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, TARGET_HEIGHT)
 
-    cv2.namedWindow("Analizador de Péndulo")
-    cv2.setMouseCallback("Analizador de Péndulo", onMouse)
+    cv2.namedWindow("Analizador de Pendulo")
+    cv2.setMouseCallback("Analizador de Pendulo", onMouse)
 
     while True:
         ret, frame = cap.read()
@@ -158,7 +158,7 @@ def run_pendulum(model_path):
                     (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
         calib.draw_info(disp, lang='es')
-        cv2.imshow("Analizador de Péndulo", disp)
+        cv2.imshow("Analizador de Pendulo", disp)
 
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'): break

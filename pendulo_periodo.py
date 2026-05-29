@@ -145,8 +145,8 @@ def run_period(model_path):
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, TARGET_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, TARGET_HEIGHT)
 
-    cv2.namedWindow("Período vs. Longitud")
-    cv2.setMouseCallback("Período vs. Longitud", onMouse)
+    cv2.namedWindow("Periodo vs. Longitud")
+    cv2.setMouseCallback("Periodo vs. Longitud", onMouse)
 
     while True:
         ret, frame = cap.read()
@@ -238,7 +238,7 @@ def run_period(model_path):
         cv2.putText(disp, f"{estado} | S:Iniciar  G:Grafica  C:Limpiar todo  R:Reiniciar pivote  Q:Salir",
                     (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
         calib.draw_info(disp, lang='es')
-        cv2.imshow("Período vs. Longitud", disp)
+        cv2.imshow("Periodo vs. Longitud", disp)
 
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
