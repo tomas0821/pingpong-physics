@@ -2,7 +2,7 @@ import cv2
 from ultralytics import YOLO
 import numpy as np
 import time
-import threading
+import math
 from collections import deque
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
@@ -18,7 +18,7 @@ TARGET_WIDTH, TARGET_HEIGHT = 1280, 720
 CONFIDENCE_THRESHOLD = 0.6
 POINT_HISTORY_LENGTH = 500
 G_CM_S2 = 981.0  # cm/s²
-VELOCITY_SMOOTH_WINDOW = 5
+ANGLE_FIT_WINDOW = 15  # detections used for polynomial angular-velocity fit
 
 # --- Variables de estado ---
 calib = LineCalibration(DEFAULT_SCALE_CM)
@@ -28,6 +28,8 @@ tracking_active = False
 is_paused = False
 # Cada entrada: (pos_cm, t, v, h_cm, ke, pe, e)
 energy_history = deque(maxlen=POINT_HISTORY_LENGTH)
+# Historial de ángulos para el ajuste polinomial: (t, angle_rad)
+angle_history = deque(maxlen=POINT_HISTORY_LENGTH)
 pendulum_length_cm = None
 E0 = None
 
@@ -46,16 +48,20 @@ def onMouse(event, x, y, flags, param):
 
 def compute_energy(pos_cm, t):
     """
-    Devuelve (v_cm_s, h_cm, ec_especifica, ep_especifica, e_especifica) o None.
-    Todas las energías son específicas (por unidad de masa), en cm²/s².
-    h es la altura sobre el punto más bajo de la oscilación (justo debajo del pivote).
-    v se calcula a partir de los últimos VELOCITY_SMOOTH_WINDOW fotogramas.
+    Devuelve (v, h_cm, ec, ep, e) o None.
+
+    La velocidad se obtiene ajustando un polinomio al historial de ángulos
+    recientes y evaluando su derivada analítica. Esto permite que v→0 en los
+    extremos del péndulo aunque el FPS sea bajo, a diferencia de calcular
+    desplazamiento frame-a-frame.
+    Energías específicas (por unidad de masa) en cm²/s².
     """
     global pendulum_length_cm
 
     if pivot_point_cm is None or len(energy_history) < 2:
         return None
 
+    # Fijar la longitud del péndulo con las primeras 10 detecciones
     if pendulum_length_cm is None:
         if len(energy_history) < 10:
             return None
@@ -66,24 +72,34 @@ def compute_energy(pos_cm, t):
         pendulum_length_cm = float(np.mean(L_samples))
         print(f"Longitud del péndulo fijada: {pendulum_length_cm:.2f} cm")
 
+    # Altura sobre el punto más bajo de la oscilación
     lowest_y = pivot_point_cm[1] + pendulum_length_cm
     h_cm = max(0.0, lowest_y - pos_cm[1])
 
-    # Average frame-to-frame speeds (not net displacement) so direction reversals
-    # inside the window don't cancel out velocity near the turning points.
-    window = list(energy_history)[max(0, len(energy_history) - VELOCITY_SMOOTH_WINDOW):]
-    if len(window) < 2:
+    # Ángulo respecto al pivote
+    dx = float(pos_cm[0] - pivot_point_cm[0])
+    dy = float(pos_cm[1] - pivot_point_cm[1])
+    angle = math.atan2(dx, dy)
+    angle_history.append((t, angle))
+
+    if len(angle_history) < 4:
         return None
-    speeds = []
-    for i in range(1, len(window)):
-        p_prev, t_prev = window[i-1][0], window[i-1][1]
-        p_curr, t_curr = window[i][0], window[i][1]
-        dt_i = t_curr - t_prev
-        if dt_i > 1e-6:
-            speeds.append(float(np.linalg.norm(p_curr - p_prev) / dt_i))
-    if not speeds:
+
+    # Ajuste polinomial al historial de ángulos → derivada analítica = ω(t)
+    window = list(angle_history)[max(0, len(angle_history) - ANGLE_FIT_WINDOW):]
+    t_win = np.array([p[0] for p in window])
+    a_win = np.array([p[1] for p in window])
+    t0 = t_win[0]
+    t_norm = t_win - t0  # normalizar para estabilidad numérica
+
+    try:
+        deg = min(3, len(window) - 1)
+        coeffs = np.polyfit(t_norm, a_win, deg=deg)
+        omega = float(np.poly1d(np.polyder(coeffs))(t - t0))  # rad/s
+    except Exception:
         return None
-    v = float(np.mean(speeds))  # cm/s
+
+    v = pendulum_length_cm * abs(omega)  # cm/s
 
     ec = 0.5 * v**2
     ep = G_CM_S2 * h_cm
@@ -195,79 +211,42 @@ def plot_energy(history):
 
 def run_energy(model_path):
     global tracking_active, is_paused, pivot_point_px, pivot_point_cm
-    global calib, energy_history, pendulum_length_cm, E0
+    global calib, energy_history, angle_history, pendulum_length_cm, E0
 
     model = YOLO(model_path)
     cap = cv2.VideoCapture(CAMERA_INDEX)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, TARGET_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, TARGET_HEIGHT)
 
-    # --- Shared state for inference thread ---
-    frame_lock  = threading.Lock()
-    result_lock = threading.Lock()
-    shared = {
-        'frame': None, 'frame_time': None,
-        'det': None,   # (center_px, pos_cm_array, w_px, timestamp) or None
-        'stop': False,
-    }
-
-    def inference_worker():
-        while not shared['stop']:
-            with frame_lock:
-                if shared['frame'] is None:
-                    continue
-                frame_copy = shared['frame'].copy()
-                frame_time = shared['frame_time']
-            results = model(frame_copy, conf=CONFIDENCE_THRESHOLD, verbose=False, imgsz=1024)
-            det = None
-            if results and results[0].boxes:
-                best = max(results[0].boxes, key=lambda b: b.conf[0])
-                box = best.xyxy[0]
-                center_px = (int((box[0] + box[2]) / 2), int((box[1] + box[3]) / 2))
-                pos_cm = calib.map_point(center_px[0], center_px[1])
-                if pos_cm is not None:
-                    det = (center_px, np.array(pos_cm), int(box[2] - box[0]), frame_time)
-            with result_lock:
-                shared['det'] = det
-
-    infer_thread = threading.Thread(target=inference_worker, daemon=True)
-    infer_thread.start()
-
     cv2.namedWindow("Conservacion de Energia")
     cv2.setMouseCallback("Conservacion de Energia", onMouse)
-
-    last_det_time = None  # avoid processing the same detection twice
-    det_px = None
 
     while True:
         ret, frame = cap.read()
         if not ret:
             break
         curr_t = time.time()
+        det_px = None
 
-        # Always feed the latest frame to the inference thread
-        with frame_lock:
-            shared['frame'] = frame
-            shared['frame_time'] = curr_t
-
-        # Consume latest detection (only when tracking and not paused)
         if tracking_active and not is_paused and pivot_point_cm is not None:
-            with result_lock:
-                det = shared['det']
-            if det is not None and det[3] != last_det_time:
-                last_det_time = det[3]
-                center_px, pos_cm, w_px, det_time = det
-                result = compute_energy(pos_cm, det_time)
-                if result is not None:
-                    v, h_cm, ec, ep, e = result
-                    if E0 is None:
-                        E0 = e
-                    energy_history.append((pos_cm, det_time, v, h_cm, ec, ep, e))
-                else:
-                    energy_history.append((pos_cm, det_time, 0, 0, 0, 0, 0))
-                det_px = (center_px, w_px)
-        else:
-            det_px = None
+            results = model(frame, conf=CONFIDENCE_THRESHOLD, verbose=False, imgsz=1024)
+            if results and results[0].boxes:
+                best = max(results[0].boxes, key=lambda b: b.conf[0])
+                box = best.xyxy[0]
+                center_px = (int((box[0] + box[2]) / 2), int((box[1] + box[3]) / 2))
+                pos_cm = calib.map_point(center_px[0], center_px[1])
+                if pos_cm is not None:
+                    pos_cm = np.array(pos_cm)
+                    result = compute_energy(pos_cm, curr_t)
+                    if result is not None:
+                        v, h_cm, ec, ep, e = result
+                        if E0 is None:
+                            E0 = e
+                        energy_history.append((pos_cm, curr_t, v, h_cm, ec, ep, e))
+                        det_px = (center_px, int(box[2] - box[0]))
+                    else:
+                        energy_history.append((pos_cm, curr_t, 0, 0, 0, 0, 0))
+                        det_px = (center_px, int(box[2] - box[0]))
 
         disp = frame.copy()
 
@@ -317,9 +296,9 @@ def run_energy(model_path):
             tracking_active = not tracking_active
             if tracking_active:
                 energy_history.clear()
+                angle_history.clear()
                 pendulum_length_cm = None
                 E0 = None
-                last_det_time = None
         elif key == ord('p'):
             is_paused = not is_paused
         elif key == ord('g') and is_paused:
@@ -329,11 +308,10 @@ def run_energy(model_path):
             pivot_point_cm = None
             calib.reset()
             energy_history.clear()
+            angle_history.clear()
             pendulum_length_cm = None
             E0 = None
-            last_det_time = None
 
-    shared['stop'] = True
     cap.release()
     cv2.destroyAllWindows()
 
