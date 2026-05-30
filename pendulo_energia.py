@@ -5,7 +5,6 @@ import time
 import math
 from collections import deque
 import matplotlib.pyplot as plt
-from scipy.signal import find_peaks
 from scipy.optimize import curve_fit
 import argparse
 import os
@@ -181,134 +180,83 @@ def plot_energy(history):
         return
 
     data = list(history)
-    t0 = data[0][1]
-    t  = np.array([d[1] - t0 for d in data])
-    v  = np.array([d[2]       for d in data])
-    h  = np.array([d[3]       for d in data])
-    ec = np.array([d[4]       for d in data])
-    ep = np.array([d[5]       for d in data])
-    e  = np.array([d[6]       for d in data])
+    t0   = data[0][1]
+    t    = np.array([d[1] - t0 for d in data])
+    v    = np.array([d[2]       for d in data])
 
-    # --- Detección de picos ---
-    v_peak_idx, _ = find_peaks(v, prominence=np.std(v) * 0.4, distance=5)
-    h_peak_idx, _ = find_peaks(h, prominence=np.std(h) * 0.3, distance=5)
-
-    # --- Extracción de g: g = v²_fondo / (2 · h_cima) ---
-    g_estimates, g_times = [], []
-    for hi in h_peak_idx:
-        if h[hi] < 0.5:
-            continue
-        if len(v_peak_idx) == 0:
-            continue
-        vi = v_peak_idx[np.argmin(np.abs(v_peak_idx - hi))]
-        if abs(t[hi] - t[vi]) > 2.0:
-            continue
-        if v[vi] < 1.0:
-            continue
-        g_cm = v[vi] ** 2 / (2.0 * h[hi])   # cm/s²
-        g_estimates.append(g_cm / 100.0)     # → m/s²
-        g_times.append((t[hi] + t[vi]) / 2.0)
-
-    # --- Energía en cada cruce inferior ---
-    e_fondo = e[v_peak_idx] if len(v_peak_idx) else np.array([])
-    t_fondo = t[v_peak_idx] if len(v_peak_idx) else np.array([])
-
-    # --- Gráfica ---
     fit_result = fit_g_from_omega()
     ang_data   = list(angle_history)
 
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(11, 11), sharex=True)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(11, 8), sharex=True)
 
-    # Panel 1 — ajuste de oscilación amortiguada θ(t)
+    # --- Panel 1: ajuste de oscilación amortiguada θ(t) ---
     if ang_data:
-        t_ang_main = np.array([d[0] for d in ang_data]) - t0
-        theta_ang  = np.degrees(np.array([d[1] for d in ang_data]))
-        ax1.plot(t_ang_main, theta_ang, 'b.', markersize=2, alpha=0.6, label='datos θ')
+        t_ang = np.array([d[0] for d in ang_data]) - t0
+        theta  = np.degrees(np.array([d[1] for d in ang_data]))
+        ax1.plot(t_ang, theta, 'b.', markersize=2, alpha=0.6, label='datos θ')
         if fit_result is not None:
             _, _, popt, t_ang_start = fit_result
             A, beta, omega_fit, phi = popt
-            T_fit = 2 * np.pi / omega_fit
-            t_norm_dur = t_ang_main[-1] - t_ang_main[0]
-            t_norm_sm  = np.linspace(0, t_norm_dur, 500)
+            T_fit      = 2 * np.pi / omega_fit
+            t_norm_sm  = np.linspace(0, t_ang[-1] - t_ang[0], 500)
             theta_sm   = np.degrees(damped_oscillation(t_norm_sm, *popt))
             ax1.plot(t_norm_sm + (t_ang_start - t0), theta_sm, 'g-', linewidth=1.5,
-                     label=f'Ajuste: A={np.degrees(A):.1f}°  β={beta:.3f} s⁻¹  ω={omega_fit:.3f} rad/s  T={T_fit:.3f} s')
+                     label=f'Ajuste: A={np.degrees(A):.1f}°  β={beta:.3f} s⁻¹'
+                           f'  ω={omega_fit:.3f} rad/s  T={T_fit:.3f} s')
     ax1.set_ylabel('Ángulo θ  (grados)')
     ax1.set_title('Ajuste de Oscilación Amortiguada  θ(t) = A·e^{−βt}·cos(ωt+φ)')
-    ax1.legend(); ax1.grid()
+    ax1.legend(fontsize=8); ax1.grid()
 
-    # Panel 2 — retención de energía
-    if e[0] > 0:
-        ax2.plot(t, e / e[0] * 100, 'g-', linewidth=1.2, label='E(t)/E₀')
-    if len(e_fondo) >= 2:
-        ax2.scatter(t_fondo, e_fondo / e_fondo[0] * 100,
-                    color='k', zorder=5, s=30, label='E en cruces inferiores')
-    ax2.axhline(100, color='k', linestyle='--', linewidth=0.8)
-    ax2.set_ylabel('E(t) / E₀  (%)')
-    ax2.set_title('Retención de Energía')
-    ax2.legend(); ax2.grid()
+    # --- Panel 2: θ(t) y v(t) en ejes gemelos ---
+    c_theta = 'steelblue'
+    c_v     = 'crimson'
 
-    # Panel 3 — extracción de g: ajuste ω²·L + dispersión v²/2h
-    g_arr  = np.array(g_estimates) if g_estimates else None
-    g_mean = float(np.mean(g_arr)) if g_arr is not None else None
-    g_std  = float(np.std(g_arr))  if g_arr is not None else None
+    if ang_data:
+        t_ang = np.array([d[0] for d in ang_data]) - t0
+        theta  = np.degrees(np.array([d[1] for d in ang_data]))
+        ax2.plot(t_ang, theta, color=c_theta, linewidth=1.0, alpha=0.7, label='θ (°)')
+    ax2.axhline(0, color=c_theta, linestyle=':', linewidth=0.7, alpha=0.5)
+    ax2.set_ylabel('Ángulo θ  (grados)', color=c_theta)
+    ax2.tick_params(axis='y', labelcolor=c_theta)
 
-    if fit_result is not None or g_arr is not None:
-        ax3.axhline(9.81, color='r', linestyle='--', linewidth=1.5, label='g teórica = 9.81 m/s²')
+    ax2b = ax2.twinx()
+    ax2b.plot(t, v, color=c_v, linewidth=1.0, alpha=0.6, label='v medida (cm/s)')
 
-        if g_arr is not None:
-            pct_scatter = abs(g_mean - 9.81) / 9.81 * 100
-            ax3.scatter(g_times, g_arr, color='purple', zorder=5, s=40, alpha=0.6,
-                        label='v²/2h por semiciclo')
-            ax3.axhline(g_mean, color='purple', linestyle=':', linewidth=1.2,
-                        label=f'media v²/2h = {g_mean:.2f} ± {g_std:.2f} m/s²')
-            ax3.fill_between([t[0], t[-1]], g_mean - g_std, g_mean + g_std,
-                             alpha=0.10, color='purple')
+    # Velocidad teórica suave: v = L·|dθ/dt| a partir del ajuste
+    if fit_result is not None and ang_data and pendulum_length_cm is not None:
+        _, _, popt, t_ang_start = fit_result
+        A, beta, omega_fit, phi = popt
+        t_ang_loc  = np.array([d[0] for d in ang_data]) - t0
+        t_norm_sm  = np.linspace(0, t_ang_loc[-1] - t_ang_loc[0], 500)
+        dtheta_dt  = (-A * beta  * np.exp(-beta * t_norm_sm) * np.cos(omega_fit * t_norm_sm + phi)
+                      - A * omega_fit * np.exp(-beta * t_norm_sm) * np.sin(omega_fit * t_norm_sm + phi))
+        v_theory   = pendulum_length_cm * np.abs(dtheta_dt)
+        ax2b.plot(t_norm_sm + (t_ang_start - t0), v_theory,
+                  color=c_v, linestyle='--', linewidth=1.5, alpha=0.9,
+                  label='v ajuste (cm/s)')
 
-        if fit_result is not None:
-            g_val, g_sig = fit_result[0], fit_result[1]
-            pct_fit = abs(g_val - 9.81) / 9.81 * 100
-            ax3.axhline(g_val, color='steelblue', linestyle='-', linewidth=2.0,
-                        label=f'ajuste ω²·L = {g_val:.3f} ± {g_sig:.3f} m/s²  (err {pct_fit:.1f}%)')
-            ax3.fill_between([t[0], t[-1]], g_val - g_sig, g_val + g_sig,
-                             alpha=0.20, color='steelblue')
-            ax3.set_title(f'g (ajuste ω²·L): {g_val:.3f} ± {g_sig:.3f} m/s²  |  Error: {pct_fit:.1f}%')
-        else:
-            ax3.set_title(f'g (v²/2h): {g_mean:.2f} ± {g_std:.2f} m/s²  |  Error: {pct_scatter:.1f}%')
+    ax2b.set_ylabel('Velocidad v  (cm/s)', color=c_v)
+    ax2b.tick_params(axis='y', labelcolor=c_v)
 
-        ax3.set_ylabel('g  (m/s²)')
-        ax3.legend(); ax3.grid()
+    lines1, labels1 = ax2.get_legend_handles_labels()
+    lines2, labels2 = ax2b.get_legend_handles_labels()
+    ax2.legend(lines1 + lines2, labels1 + labels2, loc='upper right', fontsize=8)
+    ax2.set_xlabel('Tiempo (s)')
+    ax2.set_title('Ángulo y Velocidad vs. Tiempo')
+    ax2.grid()
 
-        if fit_result is not None:
-            g_val, g_sig = fit_result[0], fit_result[1]
-            pct_fit = abs(g_val - 9.81) / 9.81 * 100
-            A_fit = fit_result[2][0]
-            corr  = (1.0 + A_fit**2 / 16.0) ** 2
-            print("\n--- Extracción de g (ajuste ω²·L) ---")
-            print(f"  g (corregida)   = {g_val:.4f} ± {g_sig:.4f} m/s²")
-            print(f"  g (ω²·L bruta)  = {g_val/corr:.4f} m/s²")
-            print(f"  Corrección ángulo grande: ×{corr:.4f}  (A₀={np.degrees(A_fit):.1f}°)")
-            print(f"  g teórica       = 9.8100 m/s²")
-            print(f"  % Error         : {pct_fit:.2f}%")
-        if g_arr is not None:
-            pct_scatter = abs(g_mean - 9.81) / 9.81 * 100
-            print("\n--- Extracción de g (método v²/2h) ---")
-            print(f"  g = {g_mean:.3f} ± {g_std:.3f} m/s²")
-            print(f"  % Error    : {pct_scatter:.2f}%")
-            print(f"  N muestras : {len(g_estimates)}")
-    else:
-        ax3.text(0.5, 0.5,
-                 'Ciclos insuficientes.\nDeje el péndulo completar al menos 3 oscilaciones completas.',
-                 ha='center', va='center', transform=ax3.transAxes, fontsize=11)
-        ax3.set_ylabel('g  (m/s²)')
-
-    ax3.set_xlabel('Tiempo (s)')
-
-    if len(e_fondo) >= 2:
-        loss = np.diff(e_fondo) / e_fondo[:-1] * 100
-        print(f"\n--- Pérdida de Energía ---")
-        print(f"  Pérdida media por cruce inferior : {np.mean(np.abs(loss)):.1f}%")
-        print(f"  E total retenida (inicio→fin)    : {e_fondo[-1] / e_fondo[0] * 100:.1f}%")
+    # Consola: g extraída por ajuste ω²·L
+    if fit_result is not None:
+        g_val, g_sig = fit_result[0], fit_result[1]
+        pct_fit = abs(g_val - 9.81) / 9.81 * 100
+        A_fit   = fit_result[2][0]
+        corr    = (1.0 + A_fit**2 / 16.0) ** 2
+        print("\n--- Extracción de g (ajuste ω²·L) ---")
+        print(f"  g (corregida)   = {g_val:.4f} ± {g_sig:.4f} m/s²")
+        print(f"  g (ω²·L bruta)  = {g_val/corr:.4f} m/s²")
+        print(f"  Corrección ángulo grande: ×{corr:.4f}  (A₀={np.degrees(A_fit):.1f}°)")
+        print(f"  g teórica       = 9.8100 m/s²")
+        print(f"  % Error         : {pct_fit:.2f}%")
 
     plt.tight_layout()
     plt.savefig('conservacion_energia.pdf', bbox_inches='tight')
