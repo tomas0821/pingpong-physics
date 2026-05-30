@@ -68,9 +68,24 @@ def fit_g_from_omega():
             maxfev=10000,
         )
         omega       = float(popt[2])
+        A_fit       = float(popt[0])
         sigma_omega = float(np.sqrt(np.diag(pcov)[2]))
-        g       = omega**2 * pendulum_length_cm / 100.0
-        g_sigma = 2.0 * omega * sigma_omega * pendulum_length_cm / 100.0
+
+        # Mejora 2: L robusto — mediana sobre todos los fotogramas capturados
+        if len(energy_history) >= 10 and pivot_point_cm is not None:
+            dists = [float(np.linalg.norm(np.array(e[0]) - np.array(pivot_point_cm)))
+                     for e in energy_history]
+            L_cm = float(np.median(dists))
+        else:
+            L_cm = pendulum_length_cm
+
+        # Mejora 1: corrección de ángulo grande
+        # T_real ≈ T_pequeño·(1 + A²/16)  →  ω_pequeño = ω_ajuste·(1 + A²/16)
+        # g = ω_pequeño²·L = ω_ajuste²·L·(1 + A_ajuste²/16)²
+        corr    = (1.0 + A_fit**2 / 16.0) ** 2
+        g       = omega**2 * L_cm / 100.0 * corr
+        g_sigma = 2.0 * omega * sigma_omega * L_cm / 100.0 * corr
+
         return g, g_sigma, list(popt), t_start_abs
     except Exception:
         return None
@@ -267,10 +282,14 @@ def plot_energy(history):
         if fit_result is not None:
             g_val, g_sig = fit_result[0], fit_result[1]
             pct_fit = abs(g_val - 9.81) / 9.81 * 100
+            A_fit = fit_result[2][0]
+            corr  = (1.0 + A_fit**2 / 16.0) ** 2
             print("\n--- Extracción de g (ajuste ω²·L) ---")
-            print(f"  g = {g_val:.4f} ± {g_sig:.4f} m/s²")
-            print(f"  g teórica  : 9.8100 m/s²")
-            print(f"  % Error    : {pct_fit:.2f}%")
+            print(f"  g (corregida)   = {g_val:.4f} ± {g_sig:.4f} m/s²")
+            print(f"  g (ω²·L bruta)  = {g_val/corr:.4f} m/s²")
+            print(f"  Corrección ángulo grande: ×{corr:.4f}  (A₀={np.degrees(A_fit):.1f}°)")
+            print(f"  g teórica       = 9.8100 m/s²")
+            print(f"  % Error         : {pct_fit:.2f}%")
         if g_arr is not None:
             pct_scatter = abs(g_mean - 9.81) / 9.81 * 100
             print("\n--- Extracción de g (método v²/2h) ---")

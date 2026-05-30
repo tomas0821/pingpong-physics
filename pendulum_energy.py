@@ -67,9 +67,24 @@ def fit_g_from_omega():
             maxfev=10000,
         )
         omega       = float(popt[2])
+        A_fit       = float(popt[0])
         sigma_omega = float(np.sqrt(np.diag(pcov)[2]))
-        g       = omega**2 * pendulum_length_cm / 100.0
-        g_sigma = 2.0 * omega * sigma_omega * pendulum_length_cm / 100.0
+
+        # Improvement 2: robust L — median over all collected frames
+        if len(energy_history) >= 10 and pivot_point_cm is not None:
+            dists = [float(np.linalg.norm(np.array(e[0]) - np.array(pivot_point_cm)))
+                     for e in energy_history]
+            L_cm = float(np.median(dists))
+        else:
+            L_cm = pendulum_length_cm
+
+        # Improvement 1: large-angle correction
+        # T_actual ≈ T_simple·(1 + A²/16)  →  ω_simple = ω_fit·(1 + A²/16)
+        # g = ω_simple²·L = ω_fit²·L·(1 + A_fit²/16)²
+        corr    = (1.0 + A_fit**2 / 16.0) ** 2
+        g       = omega**2 * L_cm / 100.0 * corr
+        g_sigma = 2.0 * omega * sigma_omega * L_cm / 100.0 * corr
+
         return g, g_sigma, list(popt), t_start_abs
     except Exception:
         return None
@@ -251,10 +266,14 @@ def plot_energy(history):
         if fit_result is not None:
             g_val, g_sig = fit_result[0], fit_result[1]
             pct_fit = abs(g_val - 9.81) / 9.81 * 100
+            A_fit = fit_result[2][0]
+            corr  = (1.0 + A_fit**2 / 16.0) ** 2
             print("\n--- Gravity Extraction (ω²·L fit) ---")
-            print(f"  g = {g_val:.4f} ± {g_sig:.4f} m/s²")
-            print(f"  Theoretical: 9.8100 m/s²")
-            print(f"  % Error    : {pct_fit:.2f}%")
+            print(f"  g (corrected) = {g_val:.4f} ± {g_sig:.4f} m/s²")
+            print(f"  g (raw ω²·L)  = {g_val/corr:.4f} m/s²")
+            print(f"  Large-angle correction: ×{corr:.4f}  (A₀={np.degrees(A_fit):.1f}°)")
+            print(f"  Theoretical   = 9.8100 m/s²")
+            print(f"  % Error       : {pct_fit:.2f}%")
         if g_arr is not None:
             pct_scatter = abs(g_mean - 9.81) / 9.81 * 100
             print("\n--- Gravity Extraction (v²/2h method) ---")
