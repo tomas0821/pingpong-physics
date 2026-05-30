@@ -50,9 +50,29 @@ Pre-trained weights for YOLO11n optimized at 1024px resolution are available in 
    pip install openvino
    ```
 
+## 📷 Camera Setup
+
+Optimal positioning depends on pendulum length:
+
+| Pendulum length | Camera distance | Ball size in frame |
+|---|---|---|
+| 10–20 cm | **0.5–0.75 m** | ~40–60 px — maximum accuracy |
+| 20–60 cm | 1.0–1.5 m | ~20–30 px — good balance |
+| 60–100 cm | 1.5–2.0 m | ~15–20 px — needed to fit full arc |
+
+- Point the camera **perpendicular to the swing plane** and at **pivot height**.
+- Place the calibration ruler in the **same plane as the swing** — a ruler on a wall behind the pendulum introduces a scale error of approximately $\delta / D \times 100\%$ where $\delta$ is the depth offset and $D$ is the camera distance.
+
 ## 📈 Experiments
 
-All experiments share the same calibration workflow: click 4 corners of a known reference area to establish the pixel→cm mapping, then set up the experiment and press **S** to start.
+### Calibration
+
+Two calibration methods are used depending on the experiment:
+
+- **Pendulum scripts** — 2-click line calibration: click both ends of a known reference (default 30 cm). Establishes a uniform px→cm scale.
+- **Collision scripts** — 4-point perspective calibration: click the 4 corners of a known rectangle (default 40×20 cm). Corrects for camera angle and perspective.
+
+After calibration, click to set the pivot (pendulum) or begin tracking (collisions), then press **S** to start.
 
 ### 1. Collisions & Momentum
 Run `python collisions_v2.py` (or `colisiones_v2.py` for Spanish).
@@ -62,24 +82,29 @@ Run `python collisions_v2.py` (or `colisiones_v2.py` for Spanish).
 
 ### 2. Damped Harmonic Motion
 Run `python pendulum_v2.py` (or `pendulo_v2.py` for Spanish).
-*   **Setup**: Calibrate, then click to set the pivot point.
+*   **Calibration**: Click both ends of a 30 cm reference to set scale.
+*   **Setup**: Click to set the pivot point.
 *   **Fitting**: Press **G** while paused to fit the angular data to:
     $$\theta(t) = A_0 e^{-\beta t} \cos(\omega t + \phi)$$
 *   **Output**: `pendulo_ajuste.pdf` and console summary of $A_0$, $\beta$, $\omega$, $T$, $\phi$.
 
-### 3. Energy Conservation
+### 3. Energy Conservation & g Extraction
 Run `python pendulum_energy.py` (or `pendulo_energia.py` for Spanish).
-*   **Setup**: Calibrate, then click to set the pivot point.
-*   **Live readout**: Linear speed $v$ (cm/s), height $h$ (cm), KE/m, PE/m, and % energy retained.
-*   **Physics**: Press **G** while paused to generate a 3-panel plot:
-    1. KE/m, PE/m, and total E/m vs. time.
-    2. Energy retention E(t)/E₀ (%) with per-swing markers.
-    3. Gravitational acceleration $g$ extracted per half-swing via $g = v_\text{bottom}^2 / (2h_\text{top})$, compared against 9.81 m/s².
-*   **Output**: `conservacion_energia.pdf` and console summary of measured $g$, % error, and energy loss per cycle.
+*   **Calibration**: Click both ends of a 30 cm reference to set scale.
+*   **Setup**: Click to set the pivot point.
+*   **Velocity method**: At each frame, a degree-3 polynomial is fitted to the angle history of the current half-swing; the analytical derivative gives $\omega(t)$, then $v = L \cdot |\omega|$. This correctly forces $v \to 0$ at the turning points even at low frame rates.
+*   **Pendulum length**: Computed as the median pivot-to-ball distance over all collected frames (robust to outlier detections).
+*   **Physics**: Press **G** while paused to generate a 2-panel plot:
+    1. **θ(t) fit** — raw angle data overlaid with $\theta(t) = A_0 e^{-\beta t} \cos(\omega t + \phi)$. Fit parameters ($A_0$, $\beta$, $\omega$, $T$) are shown in the legend.
+    2. **Energy from the fit** — KE/m = $\frac{1}{2}v^2$ and PE/m = $g \cdot h$ computed analytically from the fit, where $h = L(1 - \cos\theta)$ (exact formula). Gravitational acceleration is extracted as:
+    $$g = \omega^2 L \left(1 + \frac{A_0^2}{16}\right)^2$$
+    The correction factor $(1 + A_0^2/16)^2$ accounts for the period elongation at large amplitudes (~3% at 30°, ~8% at 45°). The measured $g$ and % error vs 9.81 m/s² appear in the panel title.
+*   **Output**: `conservacion_energia.pdf` and console summary of corrected $g$, raw $g$, correction factor, and % error.
 
 ### 4. Period vs. Length
 Run `python pendulum_period.py` (or `pendulo_periodo.py` for Spanish).
-*   **Setup**: Calibrate, then click to set the pivot point.
+*   **Calibration**: Click both ends of a 30 cm reference to set scale.
+*   **Setup**: Click to set the pivot point.
 *   **Workflow**: Hang the pendulum at length $L_1$, press **S** — the script auto-locks $L$ from the first detections, counts 10 full cycles, stores the result, and stops. Change the string length and press **S** again. Repeat for 5–6 lengths.
 *   **Physics**: Press **G** (with ≥ 3 runs) to plot $T^2$ vs $L$. The slope gives $4\pi^2/g$:
     $$g = \frac{4\pi^2}{\text{slope}}$$
@@ -88,7 +113,8 @@ Run `python pendulum_period.py` (or `pendulo_periodo.py` for Spanish).
 ## 🔬 Physics Education Context
 
 This tool is designed to bridge the gap between "Black Box" technology and fundamental physics.
-*   **Error Analysis**: Students can compare their measured $g$ across methods (energy conservation vs. period vs. length) and discuss sources of systematic error.
+*   **Multiple g extraction methods**: Students can compare $g$ measured via energy conservation ($\omega^2 L$ fit), period-vs-length ($T^2 \propto L$ slope), and damped oscillation fitting, and discuss sources of systematic error in each.
+*   **Large-angle correction**: The energy script applies the first-order period correction for non-small amplitudes, making the result accurate even when students use 30–45° swings.
 *   **High Sampling Rate**: Reach up to 60–120 FPS, providing significantly more data points than manual video analysis.
 
 ## 📜 License
