@@ -5,6 +5,7 @@ import time
 import math
 from collections import deque
 import matplotlib.pyplot as plt
+from matplotlib.collections import LineCollection
 from scipy.optimize import curve_fit
 import argparse
 import os
@@ -181,13 +182,14 @@ def plot_energy(history):
 
     data = list(history)
     t0   = data[0][1]
-    t    = np.array([d[1] - t0 for d in data])
-    v    = np.array([d[2]       for d in data])
 
     fit_result = fit_g_from_omega()
     ang_data   = list(angle_history)
 
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(11, 11), sharex=True)
+    fig = plt.figure(figsize=(11, 11))
+    ax1 = fig.add_subplot(3, 1, 1)
+    ax2 = fig.add_subplot(3, 1, 2)                 # phase portrait — own x-axis
+    ax3 = fig.add_subplot(3, 1, 3, sharex=ax1)     # time axis shared with panel 1
 
     # --- Panel 1: ajuste de oscilación amortiguada θ(t) ---
     if ang_data:
@@ -207,42 +209,40 @@ def plot_energy(history):
     ax1.set_title('Ajuste de Oscilación Amortiguada  θ(t) = A·e^{−βt}·cos(ωt+φ)')
     ax1.legend(fontsize=8); ax1.grid()
 
-    # --- Panel 2: θ(t) y v(t) en ejes gemelos ---
-    c_theta = 'steelblue'
-    c_v     = 'crimson'
-
-    if ang_data:
-        t_ang = np.array([d[0] for d in ang_data]) - t0
-        theta  = np.degrees(np.array([d[1] for d in ang_data]))
-        ax2.plot(t_ang, theta, color=c_theta, linewidth=1.0, alpha=0.7, label='θ (°)')
-    ax2.axhline(0, color=c_theta, linestyle=':', linewidth=0.7, alpha=0.5)
-    ax2.set_ylabel('Ángulo θ  (grados)', color=c_theta)
-    ax2.tick_params(axis='y', labelcolor=c_theta)
-
-    ax2b = ax2.twinx()
-    ax2b.plot(t, v, color=c_v, linewidth=1.0, alpha=0.6, label='v medida (cm/s)')
-
-    # Velocidad teórica suave: v = L·|dθ/dt| a partir del ajuste
+    # --- Panel 2: Retrato de fase (θ, v) — espiral amortiguada ---
     if fit_result is not None and ang_data and pendulum_length_cm is not None:
         _, _, popt, t_ang_start = fit_result
         A, beta, omega_fit, phi = popt
         t_ang_loc  = np.array([d[0] for d in ang_data]) - t0
-        t_norm_sm  = np.linspace(0, t_ang_loc[-1] - t_ang_loc[0], 500)
-        dtheta_dt  = (-A * beta  * np.exp(-beta * t_norm_sm) * np.cos(omega_fit * t_norm_sm + phi)
+        t_norm_sm  = np.linspace(0, t_ang_loc[-1] - t_ang_loc[0], 2000)
+
+        theta_ph   = np.degrees(damped_oscillation(t_norm_sm, *popt))
+        dtheta_dt  = (-A * beta      * np.exp(-beta * t_norm_sm) * np.cos(omega_fit * t_norm_sm + phi)
                       - A * omega_fit * np.exp(-beta * t_norm_sm) * np.sin(omega_fit * t_norm_sm + phi))
-        v_theory   = pendulum_length_cm * np.abs(dtheta_dt)
-        ax2b.plot(t_norm_sm + (t_ang_start - t0), v_theory,
-                  color=c_v, linestyle='--', linewidth=1.5, alpha=0.9,
-                  label='v ajuste (cm/s)')
+        v_signed   = pendulum_length_cm * dtheta_dt   # signed cm/s
 
-    ax2b.set_ylabel('Velocidad v  (cm/s)', color=c_v)
-    ax2b.tick_params(axis='y', labelcolor=c_v)
+        # Gradient colour along the curve to show time progression
+        pts  = np.array([theta_ph, v_signed]).T.reshape(-1, 1, 2)
+        segs = np.concatenate([pts[:-1], pts[1:]], axis=1)
+        lc   = LineCollection(segs, cmap='plasma', linewidth=1.8, alpha=0.9)
+        lc.set_array(t_norm_sm[:-1])
+        ax2.add_collection(lc)
+        fig.colorbar(lc, ax=ax2, label='Tiempo (s)', shrink=0.8)
 
-    lines1, labels1 = ax2.get_legend_handles_labels()
-    lines2, labels2 = ax2b.get_legend_handles_labels()
-    ax2.legend(lines1 + lines2, labels1 + labels2, loc='upper right', fontsize=8)
-    ax2.set_title('Ángulo y Velocidad vs. Tiempo')
-    ax2.grid()
+        ax2.plot(theta_ph[0],  v_signed[0],  'go', markersize=8, zorder=5, label='inicio')
+        ax2.plot(theta_ph[-1], v_signed[-1], 'rs', markersize=8, zorder=5, label='fin')
+        ax2.autoscale()
+        ax2.axhline(0, color='k', linewidth=0.5, alpha=0.4)
+        ax2.axvline(0, color='k', linewidth=0.5, alpha=0.4)
+        ax2.legend(fontsize=8, loc='upper right')
+    else:
+        ax2.text(0.5, 0.5, 'Ajuste no disponible.\nOscilar al menos 3 ciclos completos.',
+                 ha='center', va='center', transform=ax2.transAxes, fontsize=11)
+
+    ax2.set_xlabel('Ángulo θ  (grados)')
+    ax2.set_ylabel('Velocidad v  (cm/s)')
+    ax2.set_title('Retrato de Fase  (θ, v)')
+    ax2.grid(alpha=0.3)
 
     # --- Panel 3: EC y EP calculadas del ajuste ---
     if fit_result is not None and ang_data and pendulum_length_cm is not None:
