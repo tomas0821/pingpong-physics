@@ -6,6 +6,7 @@ import math
 from collections import deque
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
+from scipy.optimize import curve_fit
 import argparse
 import os
 from utils import LineCalibration
@@ -32,6 +33,46 @@ energy_history = deque(maxlen=POINT_HISTORY_LENGTH)
 angle_history = deque(maxlen=POINT_HISTORY_LENGTH)
 pendulum_length_cm = None
 E0 = None
+
+
+def damped_oscillation(t, A, beta, omega, phi):
+    return A * np.exp(-beta * t) * np.cos(omega * t + phi)
+
+
+def fit_g_from_omega():
+    """Ajusta θ(t)=A·e^{-βt}·cos(ωt+φ) al historial completo; devuelve (g_m_s2, g_sigma) o None."""
+    if pendulum_length_cm is None or len(angle_history) < 30:
+        return None
+    data = list(angle_history)
+    t_arr = np.array([d[0] for d in data])
+    theta  = np.array([d[1] for d in data])
+    t_arr  = t_arr - t_arr[0]
+
+    A0 = float(np.max(np.abs(theta)))
+    if A0 < 0.05:
+        return None
+
+    crossings = [t_arr[i] for i in range(1, len(theta)) if theta[i-1] * theta[i] < 0]
+    if len(crossings) >= 2:
+        T_est  = 2.0 * float(np.median(np.diff(crossings)))
+        omega0 = 2.0 * np.pi / T_est
+    else:
+        omega0 = 5.0
+
+    try:
+        popt, pcov = curve_fit(
+            damped_oscillation, t_arr, theta,
+            p0=[A0, 0.05, omega0, 0.0],
+            bounds=([0, 0, 0.3, -np.pi], [np.pi, 5.0, 50.0, np.pi]),
+            maxfev=10000,
+        )
+        omega       = float(popt[2])
+        sigma_omega = float(np.sqrt(np.diag(pcov)[2]))
+        g       = omega**2 * pendulum_length_cm / 100.0
+        g_sigma = 2.0 * omega * sigma_omega * pendulum_length_cm / 100.0
+        return g, g_sigma
+    except Exception:
+        return None
 
 
 def onMouse(event, x, y, flags, param):
@@ -178,28 +219,51 @@ def plot_energy(history):
     ax2.set_title('Retención de Energía')
     ax2.legend(); ax2.grid()
 
-    # Panel 3 — g medida por semiciclo
-    if g_estimates:
-        g_arr  = np.array(g_estimates)
-        g_mean = float(np.mean(g_arr))
-        g_std  = float(np.std(g_arr))
-        pct_err = abs(g_mean - 9.81) / 9.81 * 100
+    # Panel 3 — extracción de g: ajuste ω²·L + dispersión v²/2h
+    g_fit  = fit_g_from_omega()
+    g_arr  = np.array(g_estimates) if g_estimates else None
+    g_mean = float(np.mean(g_arr)) if g_arr is not None else None
+    g_std  = float(np.std(g_arr))  if g_arr is not None else None
 
-        ax3.scatter(g_times, g_arr, color='purple', zorder=5, s=40, label='g por semiciclo')
+    if g_fit is not None or g_arr is not None:
         ax3.axhline(9.81, color='r', linestyle='--', linewidth=1.5, label='g teórica = 9.81 m/s²')
-        ax3.axhline(g_mean, color='purple', linestyle='-', linewidth=1.0, alpha=0.7,
-                    label=f'g medida = {g_mean:.2f} ± {g_std:.2f} m/s²')
-        ax3.fill_between([t[0], t[-1]], g_mean - g_std, g_mean + g_std,
-                         alpha=0.15, color='purple')
+
+        if g_arr is not None:
+            pct_scatter = abs(g_mean - 9.81) / 9.81 * 100
+            ax3.scatter(g_times, g_arr, color='purple', zorder=5, s=40, alpha=0.6,
+                        label='v²/2h por semiciclo')
+            ax3.axhline(g_mean, color='purple', linestyle=':', linewidth=1.2,
+                        label=f'media v²/2h = {g_mean:.2f} ± {g_std:.2f} m/s²')
+            ax3.fill_between([t[0], t[-1]], g_mean - g_std, g_mean + g_std,
+                             alpha=0.10, color='purple')
+
+        if g_fit is not None:
+            g_val, g_sig = g_fit
+            pct_fit = abs(g_val - 9.81) / 9.81 * 100
+            ax3.axhline(g_val, color='steelblue', linestyle='-', linewidth=2.0,
+                        label=f'ajuste ω²·L = {g_val:.3f} ± {g_sig:.3f} m/s²  (err {pct_fit:.1f}%)')
+            ax3.fill_between([t[0], t[-1]], g_val - g_sig, g_val + g_sig,
+                             alpha=0.20, color='steelblue')
+            ax3.set_title(f'g (ajuste ω²·L): {g_val:.3f} ± {g_sig:.3f} m/s²  |  Error: {pct_fit:.1f}%')
+        else:
+            ax3.set_title(f'g (v²/2h): {g_mean:.2f} ± {g_std:.2f} m/s²  |  Error: {pct_scatter:.1f}%')
+
         ax3.set_ylabel('g  (m/s²)')
-        ax3.set_title(f'g medida: {g_mean:.2f} ± {g_std:.2f} m/s²  |  Error: {pct_err:.1f}%  (teórica 9.81 m/s²)')
         ax3.legend(); ax3.grid()
 
-        print("\n--- Extracción de la Gravedad ---")
-        print(f"  g medida    : {g_mean:.3f} ± {g_std:.3f} m/s²")
-        print(f"  g teórica   : 9.810 m/s²")
-        print(f"  % Error     : {pct_err:.2f}%")
-        print(f"  N muestras  : {len(g_arr)}")
+        if g_fit is not None:
+            g_val, g_sig = g_fit
+            pct_fit = abs(g_val - 9.81) / 9.81 * 100
+            print("\n--- Extracción de g (ajuste ω²·L) ---")
+            print(f"  g = {g_val:.4f} ± {g_sig:.4f} m/s²")
+            print(f"  g teórica  : 9.8100 m/s²")
+            print(f"  % Error    : {pct_fit:.2f}%")
+        if g_arr is not None:
+            pct_scatter = abs(g_mean - 9.81) / 9.81 * 100
+            print("\n--- Extracción de g (método v²/2h) ---")
+            print(f"  g = {g_mean:.3f} ± {g_std:.3f} m/s²")
+            print(f"  % Error    : {pct_scatter:.2f}%")
+            print(f"  N muestras : {len(g_estimates)}")
     else:
         ax3.text(0.5, 0.5,
                  'Ciclos insuficientes.\nDeje el péndulo completar al menos 3 oscilaciones completas.',

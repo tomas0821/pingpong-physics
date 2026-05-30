@@ -2,9 +2,11 @@ import cv2
 from ultralytics import YOLO
 import numpy as np
 import time
+import math
 from collections import deque
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
+from scipy.optimize import curve_fit
 import argparse
 import os
 from utils import LineCalibration
@@ -29,6 +31,47 @@ is_paused = False
 energy_history = deque(maxlen=POINT_HISTORY_LENGTH)
 pendulum_length_cm = None  # locked after first few detections
 E0 = None  # reference energy (first valid frame after tracking starts)
+angle_history = deque(maxlen=POINT_HISTORY_LENGTH)
+
+
+def damped_oscillation(t, A, beta, omega, phi):
+    return A * np.exp(-beta * t) * np.cos(omega * t + phi)
+
+
+def fit_g_from_omega():
+    """Fit θ(t)=A·e^{-βt}·cos(ωt+φ) to the full angle history; return (g_m_s2, g_sigma) or None."""
+    if pendulum_length_cm is None or len(angle_history) < 30:
+        return None
+    data = list(angle_history)
+    t_arr = np.array([d[0] for d in data])
+    theta  = np.array([d[1] for d in data])
+    t_arr  = t_arr - t_arr[0]
+
+    A0 = float(np.max(np.abs(theta)))
+    if A0 < 0.05:
+        return None
+
+    crossings = [t_arr[i] for i in range(1, len(theta)) if theta[i-1] * theta[i] < 0]
+    if len(crossings) >= 2:
+        T_est  = 2.0 * float(np.median(np.diff(crossings)))
+        omega0 = 2.0 * np.pi / T_est
+    else:
+        omega0 = 5.0
+
+    try:
+        popt, pcov = curve_fit(
+            damped_oscillation, t_arr, theta,
+            p0=[A0, 0.05, omega0, 0.0],
+            bounds=([0, 0, 0.3, -np.pi], [np.pi, 5.0, 50.0, np.pi]),
+            maxfev=10000,
+        )
+        omega       = float(popt[2])
+        sigma_omega = float(np.sqrt(np.diag(pcov)[2]))
+        g       = omega**2 * pendulum_length_cm / 100.0
+        g_sigma = 2.0 * omega * sigma_omega * pendulum_length_cm / 100.0
+        return g, g_sigma
+    except Exception:
+        return None
 
 
 def onMouse(event, x, y, flags, param):
@@ -71,6 +114,8 @@ def compute_energy(pos_cm, t):
     # Lowest point y_cm = pivot_y + L  (y increases downward in calibrated space)
     lowest_y = pivot_point_cm[1] + pendulum_length_cm
     h_cm = max(0.0, lowest_y - pos_cm[1])
+    angle_history.append((t, math.atan2(float(pos_cm[0] - pivot_point_cm[0]),
+                                        float(pos_cm[1] - pivot_point_cm[1]))))
 
     # Linear velocity via finite differences over a smoothing window
     # Average frame-to-frame speeds (not net displacement) so direction reversals
@@ -158,28 +203,51 @@ def plot_energy(history):
     ax2.set_title('Energy Retention')
     ax2.legend(); ax2.grid()
 
-    # Panel 3 — measured g per half-swing
-    if g_estimates:
-        g_arr  = np.array(g_estimates)
-        g_mean = float(np.mean(g_arr))
-        g_std  = float(np.std(g_arr))
-        pct_err = abs(g_mean - 9.81) / 9.81 * 100
+    # Panel 3 — g extraction: ω²·L curve fit + v²/2h scatter
+    g_fit  = fit_g_from_omega()
+    g_arr  = np.array(g_estimates) if g_estimates else None
+    g_mean = float(np.mean(g_arr)) if g_arr is not None else None
+    g_std  = float(np.std(g_arr))  if g_arr is not None else None
 
-        ax3.scatter(g_times, g_arr, color='purple', zorder=5, s=40, label='g per half-swing')
+    if g_fit is not None or g_arr is not None:
         ax3.axhline(9.81, color='r', linestyle='--', linewidth=1.5, label='g theoretical = 9.81 m/s²')
-        ax3.axhline(g_mean, color='purple', linestyle='-', linewidth=1.0, alpha=0.7,
-                    label=f'g measured = {g_mean:.2f} ± {g_std:.2f} m/s²')
-        ax3.fill_between([t[0], t[-1]], g_mean - g_std, g_mean + g_std,
-                         alpha=0.15, color='purple')
+
+        if g_arr is not None:
+            pct_scatter = abs(g_mean - 9.81) / 9.81 * 100
+            ax3.scatter(g_times, g_arr, color='purple', zorder=5, s=40, alpha=0.6,
+                        label='v²/2h per half-swing')
+            ax3.axhline(g_mean, color='purple', linestyle=':', linewidth=1.2,
+                        label=f'v²/2h mean = {g_mean:.2f} ± {g_std:.2f} m/s²')
+            ax3.fill_between([t[0], t[-1]], g_mean - g_std, g_mean + g_std,
+                             alpha=0.10, color='purple')
+
+        if g_fit is not None:
+            g_val, g_sig = g_fit
+            pct_fit = abs(g_val - 9.81) / 9.81 * 100
+            ax3.axhline(g_val, color='steelblue', linestyle='-', linewidth=2.0,
+                        label=f'ω²·L fit = {g_val:.3f} ± {g_sig:.3f} m/s²  (err {pct_fit:.1f}%)')
+            ax3.fill_between([t[0], t[-1]], g_val - g_sig, g_val + g_sig,
+                             alpha=0.20, color='steelblue')
+            ax3.set_title(f'g (ω²·L fit): {g_val:.3f} ± {g_sig:.3f} m/s²  |  Error: {pct_fit:.1f}%')
+        else:
+            ax3.set_title(f'g (v²/2h): {g_mean:.2f} ± {g_std:.2f} m/s²  |  Error: {pct_scatter:.1f}%')
+
         ax3.set_ylabel('g  (m/s²)')
-        ax3.set_title(f'Measured g: {g_mean:.2f} ± {g_std:.2f} m/s²  |  Error: {pct_err:.1f}%  (theoretical 9.81 m/s²)')
         ax3.legend(); ax3.grid()
 
-        print("\n--- Gravity Extraction ---")
-        print(f"  Measured g : {g_mean:.3f} ± {g_std:.3f} m/s²")
-        print(f"  Theoretical: 9.810 m/s²")
-        print(f"  % Error    : {pct_err:.2f}%")
-        print(f"  N samples  : {len(g_arr)}")
+        if g_fit is not None:
+            g_val, g_sig = g_fit
+            pct_fit = abs(g_val - 9.81) / 9.81 * 100
+            print("\n--- Gravity Extraction (ω²·L fit) ---")
+            print(f"  g = {g_val:.4f} ± {g_sig:.4f} m/s²")
+            print(f"  Theoretical: 9.8100 m/s²")
+            print(f"  % Error    : {pct_fit:.2f}%")
+        if g_arr is not None:
+            pct_scatter = abs(g_mean - 9.81) / 9.81 * 100
+            print("\n--- Gravity Extraction (v²/2h method) ---")
+            print(f"  g = {g_mean:.3f} ± {g_std:.3f} m/s²")
+            print(f"  % Error    : {pct_scatter:.2f}%")
+            print(f"  N samples  : {len(g_estimates)}")
     else:
         ax3.text(0.5, 0.5, 'Not enough swing cycles detected.\nLet the pendulum complete at least 3 full swings.',
                  ha='center', va='center', transform=ax3.transAxes, fontsize=11)
@@ -202,7 +270,7 @@ def plot_energy(history):
 
 def run_energy(model_path):
     global tracking_active, is_paused, pivot_point_px, pivot_point_cm
-    global calib, energy_history, pendulum_length_cm, E0
+    global calib, energy_history, angle_history, pendulum_length_cm, E0
 
     model = YOLO(model_path)
     cap = cv2.VideoCapture(CAMERA_INDEX)
@@ -286,6 +354,7 @@ def run_energy(model_path):
             tracking_active = not tracking_active
             if tracking_active:
                 energy_history.clear()
+                angle_history.clear()
                 pendulum_length_cm = None
                 E0 = None
         elif key == ord('p'):
@@ -297,6 +366,7 @@ def run_energy(model_path):
             pivot_point_cm = None
             calib.reset()
             energy_history.clear()
+            angle_history.clear()
             pendulum_length_cm = None
             E0 = None
 
