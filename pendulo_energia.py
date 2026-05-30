@@ -5,7 +5,6 @@ import time
 import math
 from collections import deque
 import matplotlib.pyplot as plt
-from matplotlib.collections import LineCollection
 from scipy.optimize import curve_fit
 import argparse
 import os
@@ -186,10 +185,7 @@ def plot_energy(history):
     fit_result = fit_g_from_omega()
     ang_data   = list(angle_history)
 
-    fig = plt.figure(figsize=(11, 11))
-    ax1 = fig.add_subplot(3, 1, 1)
-    ax2 = fig.add_subplot(3, 1, 2)                 # phase portrait — own x-axis
-    ax3 = fig.add_subplot(3, 1, 3, sharex=ax1)     # time axis shared with panel 1
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(11, 8), sharex=True)
 
     # --- Panel 1: ajuste de oscilación amortiguada θ(t) ---
     if ang_data:
@@ -209,42 +205,7 @@ def plot_energy(history):
     ax1.set_title('Ajuste de Oscilación Amortiguada  θ(t) = A·e^{−βt}·cos(ωt+φ)')
     ax1.legend(fontsize=8); ax1.grid()
 
-    # --- Panel 2: Retrato de fase (θ, v) — espiral amortiguada ---
-    if fit_result is not None and ang_data and pendulum_length_cm is not None:
-        _, _, popt, t_ang_start = fit_result
-        A, beta, omega_fit, phi = popt
-        t_ang_loc  = np.array([d[0] for d in ang_data]) - t0
-        t_norm_sm  = np.linspace(0, t_ang_loc[-1] - t_ang_loc[0], 2000)
-
-        theta_ph   = np.degrees(damped_oscillation(t_norm_sm, *popt))
-        dtheta_dt  = (-A * beta      * np.exp(-beta * t_norm_sm) * np.cos(omega_fit * t_norm_sm + phi)
-                      - A * omega_fit * np.exp(-beta * t_norm_sm) * np.sin(omega_fit * t_norm_sm + phi))
-        v_signed   = pendulum_length_cm * dtheta_dt   # signed cm/s
-
-        # Gradient colour along the curve to show time progression
-        pts  = np.array([theta_ph, v_signed]).T.reshape(-1, 1, 2)
-        segs = np.concatenate([pts[:-1], pts[1:]], axis=1)
-        lc   = LineCollection(segs, cmap='plasma', linewidth=1.8, alpha=0.9)
-        lc.set_array(t_norm_sm[:-1])
-        ax2.add_collection(lc)
-        fig.colorbar(lc, ax=ax2, label='Tiempo (s)', shrink=0.8)
-
-        ax2.plot(theta_ph[0],  v_signed[0],  'go', markersize=8, zorder=5, label='inicio')
-        ax2.plot(theta_ph[-1], v_signed[-1], 'rs', markersize=8, zorder=5, label='fin')
-        ax2.autoscale()
-        ax2.axhline(0, color='k', linewidth=0.5, alpha=0.4)
-        ax2.axvline(0, color='k', linewidth=0.5, alpha=0.4)
-        ax2.legend(fontsize=8, loc='upper right')
-    else:
-        ax2.text(0.5, 0.5, 'Ajuste no disponible.\nOscilar al menos 3 ciclos completos.',
-                 ha='center', va='center', transform=ax2.transAxes, fontsize=11)
-
-    ax2.set_xlabel('Ángulo θ  (grados)')
-    ax2.set_ylabel('Velocidad v  (cm/s)')
-    ax2.set_title('Retrato de Fase  (θ, v)')
-    ax2.grid(alpha=0.3)
-
-    # --- Panel 3: EC y EP calculadas del ajuste ---
+    # --- Panel 2: EC y EP calculadas del ajuste ---
     if fit_result is not None and ang_data and pendulum_length_cm is not None:
         _, _, popt, t_ang_start = fit_result
         A, beta, omega_fit, phi = popt
@@ -266,22 +227,22 @@ def plot_energy(history):
         pe_sm = g_cm_s2 * h_sm                                # cm²/s²
         e_sm  = ke_sm + pe_sm
 
-        ax3.plot(t_main_sm, ke_sm, 'r-',  linewidth=1.5, label='EC/m  (½v²)')
-        ax3.plot(t_main_sm, pe_sm, 'b-',  linewidth=1.5, label='EP/m  (g·h)')
-        ax3.plot(t_main_sm, e_sm,  'k-',  linewidth=2.0, label='E total/m')
-        ax3.set_ylabel('Energía específica  (cm²/s²)')
-        ax3.set_title(
+        ax2.plot(t_main_sm, ke_sm, 'r-',  linewidth=1.5, label='EC/m  (½v²)')
+        ax2.plot(t_main_sm, pe_sm, 'b-',  linewidth=1.5, label='EP/m  (g·h)')
+        ax2.plot(t_main_sm, e_sm,  'k-',  linewidth=2.0, label='E total/m')
+        ax2.set_ylabel('Energía específica  (cm²/s²)')
+        ax2.set_title(
             f'Energía del ajuste  —  '
             f'g = ω²·L·(1+A²/16)² = {g_val:.3f} ± {g_sig:.3f} m/s²'
             f'  (error {pct_err:.1f}%)'
         )
-        ax3.legend(fontsize=8); ax3.grid()
+        ax2.legend(fontsize=8); ax2.grid()
     else:
-        ax3.text(0.5, 0.5, 'Ajuste no disponible.\nOscilar el péndulo al menos 3 ciclos completos.',
-                 ha='center', va='center', transform=ax3.transAxes, fontsize=11)
-        ax3.set_ylabel('Energía específica  (cm²/s²)')
+        ax2.text(0.5, 0.5, 'Ajuste no disponible.\nOscilar el péndulo al menos 3 ciclos completos.',
+                 ha='center', va='center', transform=ax2.transAxes, fontsize=11)
+        ax2.set_ylabel('Energía específica  (cm²/s²)')
 
-    ax3.set_xlabel('Tiempo (s)')
+    ax2.set_xlabel('Tiempo (s)')
 
     # Consola: g extraída por ajuste ω²·L
     if fit_result is not None:
