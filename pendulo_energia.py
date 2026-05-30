@@ -255,17 +255,26 @@ def plot_energy(history):
         theta_sm   = damped_oscillation(t_norm_sm, *popt)
         dtheta_dt  = (-A * beta      * np.exp(-beta * t_norm_sm) * np.cos(omega_fit * t_norm_sm + phi)
                       - A * omega_fit * np.exp(-beta * t_norm_sm) * np.sin(omega_fit * t_norm_sm + phi))
+        g_val   = fit_result[0]          # m/s²
+        g_sig   = fit_result[1]
+        g_cm_s2 = g_val * 100.0          # cm/s²  — g medida, no hardcodeada
+        pct_err = abs(g_val - 9.81) / 9.81 * 100
+
         v_sm  = pendulum_length_cm * np.abs(dtheta_dt)        # cm/s
         h_sm  = pendulum_length_cm * (1.0 - np.cos(theta_sm)) # cm  (fórmula exacta)
         ke_sm = 0.5 * v_sm**2                                 # cm²/s²
-        pe_sm = G_CM_S2 * h_sm                                # cm²/s²
+        pe_sm = g_cm_s2 * h_sm                                # cm²/s²
         e_sm  = ke_sm + pe_sm
 
         ax3.plot(t_main_sm, ke_sm, 'r-',  linewidth=1.5, label='EC/m  (½v²)')
         ax3.plot(t_main_sm, pe_sm, 'b-',  linewidth=1.5, label='EP/m  (g·h)')
         ax3.plot(t_main_sm, e_sm,  'k-',  linewidth=2.0, label='E total/m')
         ax3.set_ylabel('Energía específica  (cm²/s²)')
-        ax3.set_title('Energía Cinética y Potencial (del ajuste)')
+        ax3.set_title(
+            f'Energía del ajuste  —  '
+            f'g = ω²·L·(1+A²/16)² = {g_val:.3f} ± {g_sig:.3f} m/s²'
+            f'  (error {pct_err:.1f}%)'
+        )
         ax3.legend(fontsize=8); ax3.grid()
     else:
         ax3.text(0.5, 0.5, 'Ajuste no disponible.\nOscilar el péndulo al menos 3 ciclos completos.',
