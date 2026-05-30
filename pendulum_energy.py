@@ -45,6 +45,7 @@ def fit_g_from_omega():
     data = list(angle_history)
     t_arr = np.array([d[0] for d in data])
     theta  = np.array([d[1] for d in data])
+    t_start_abs = float(t_arr[0])
     t_arr  = t_arr - t_arr[0]
 
     A0 = float(np.max(np.abs(theta)))
@@ -69,7 +70,7 @@ def fit_g_from_omega():
         sigma_omega = float(np.sqrt(np.diag(pcov)[2]))
         g       = omega**2 * pendulum_length_cm / 100.0
         g_sigma = 2.0 * omega * sigma_omega * pendulum_length_cm / 100.0
-        return g, g_sigma
+        return g, g_sigma, list(popt), t_start_abs
     except Exception:
         return None
 
@@ -182,14 +183,27 @@ def plot_energy(history):
     t_bottom = t[v_peak_idx] if len(v_peak_idx) else np.array([])
 
     # --- Plot ---
+    fit_result = fit_g_from_omega()
+    ang_data   = list(angle_history)
+
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(11, 11), sharex=True)
 
-    # Panel 1 — energy components
-    ax1.plot(t, ke, 'r-',  label='KE/m  (½v²)',  linewidth=1.2)
-    ax1.plot(t, pe, 'b-',  label='PE/m  (gh)',    linewidth=1.2)
-    ax1.plot(t, e,  'k-',  label='Total E/m',     linewidth=1.5)
-    ax1.set_ylabel('Specific energy (cm²/s²)')
-    ax1.set_title('Energy Conservation — Pendulum')
+    # Panel 1 — damped oscillation fit to θ(t)
+    if ang_data:
+        t_ang_main = np.array([d[0] for d in ang_data]) - t0
+        theta_ang  = np.degrees(np.array([d[1] for d in ang_data]))
+        ax1.plot(t_ang_main, theta_ang, 'b.', markersize=2, alpha=0.6, label='θ data')
+        if fit_result is not None:
+            _, _, popt, t_ang_start = fit_result
+            A, beta, omega_fit, phi = popt
+            T_fit = 2 * np.pi / omega_fit
+            t_norm_dur = t_ang_main[-1] - t_ang_main[0]
+            t_norm_sm  = np.linspace(0, t_norm_dur, 500)
+            theta_sm   = np.degrees(damped_oscillation(t_norm_sm, *popt))
+            ax1.plot(t_norm_sm + (t_ang_start - t0), theta_sm, 'g-', linewidth=1.5,
+                     label=f'Fit: A={np.degrees(A):.1f}°  β={beta:.3f} s⁻¹  ω={omega_fit:.3f} rad/s  T={T_fit:.3f} s')
+    ax1.set_ylabel('Angle θ  (degrees)')
+    ax1.set_title('Damped Oscillation Fit  θ(t) = A·e^{−βt}·cos(ωt+φ)')
     ax1.legend(); ax1.grid()
 
     # Panel 2 — energy retention
@@ -204,12 +218,11 @@ def plot_energy(history):
     ax2.legend(); ax2.grid()
 
     # Panel 3 — g extraction: ω²·L curve fit + v²/2h scatter
-    g_fit  = fit_g_from_omega()
     g_arr  = np.array(g_estimates) if g_estimates else None
     g_mean = float(np.mean(g_arr)) if g_arr is not None else None
     g_std  = float(np.std(g_arr))  if g_arr is not None else None
 
-    if g_fit is not None or g_arr is not None:
+    if fit_result is not None or g_arr is not None:
         ax3.axhline(9.81, color='r', linestyle='--', linewidth=1.5, label='g theoretical = 9.81 m/s²')
 
         if g_arr is not None:
@@ -221,8 +234,8 @@ def plot_energy(history):
             ax3.fill_between([t[0], t[-1]], g_mean - g_std, g_mean + g_std,
                              alpha=0.10, color='purple')
 
-        if g_fit is not None:
-            g_val, g_sig = g_fit
+        if fit_result is not None:
+            g_val, g_sig = fit_result[0], fit_result[1]
             pct_fit = abs(g_val - 9.81) / 9.81 * 100
             ax3.axhline(g_val, color='steelblue', linestyle='-', linewidth=2.0,
                         label=f'ω²·L fit = {g_val:.3f} ± {g_sig:.3f} m/s²  (err {pct_fit:.1f}%)')
@@ -235,8 +248,8 @@ def plot_energy(history):
         ax3.set_ylabel('g  (m/s²)')
         ax3.legend(); ax3.grid()
 
-        if g_fit is not None:
-            g_val, g_sig = g_fit
+        if fit_result is not None:
+            g_val, g_sig = fit_result[0], fit_result[1]
             pct_fit = abs(g_val - 9.81) / 9.81 * 100
             print("\n--- Gravity Extraction (ω²·L fit) ---")
             print(f"  g = {g_val:.4f} ± {g_sig:.4f} m/s²")
