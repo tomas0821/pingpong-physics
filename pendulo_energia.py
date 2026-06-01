@@ -179,7 +179,11 @@ def compute_energy(pos_cm, t):
                 for entry in energy_history
             ]
             pendulum_length_cm = float(np.mean(L_samples))
-            print(f"Longitud del péndulo (estimada por píxeles): {pendulum_length_cm:.2f} cm")
+            print(f"\n⚠  L estimada desde píxeles: {pendulum_length_cm:.2f} cm")
+            print(f"   Si la regla NO está en el mismo plano que el péndulo, L será incorrecta")
+            print(f"   y g tendrá el mismo error de factor.")
+            print(f"   → Mide L físicamente (pivote→centro de la pelota) y usa:")
+            print(f"     python pendulo_energia.py --length <L_cm>\n")
 
     # Altura sobre el punto más bajo de la oscilación
     lowest_y = pivot_point_cm[1] + pendulum_length_cm
@@ -393,9 +397,14 @@ def run_energy(model_path):
             cv2.circle(disp, c_px, max(5, int(w_px / 2)), (0, 255, 0), 2)
 
         if pendulum_length_cm is not None:
-            src = "manual" if manual_length_cm is not None else "px"
-            cv2.putText(disp, f"L={pendulum_length_cm:.1f} cm ({src})", (10, 60),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+            if manual_length_cm is not None:
+                l_color = (0, 255, 0)   # verde — confiable
+                l_label = f"L={pendulum_length_cm:.1f} cm (manual)"
+            else:
+                l_color = (0, 0, 255)   # rojo — advertencia
+                l_label = f"L={pendulum_length_cm:.1f} cm (pixeles - usa --length!)"
+            cv2.putText(disp, l_label, (10, 60),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, l_color, 2)
         if energy_history and energy_history[-1][6] > 0:
             last = energy_history[-1]
             v, h_cm, ec, ep, e = last[2], last[3], last[4], last[5], last[6]
