@@ -11,7 +11,7 @@ import os
 from utils import LineCalibration
 
 # ---------------- Configuración ----------------
-DEFAULT_SCALE_CM = 30.0
+DEFAULT_SCALE_CM = 20.0
 DEFAULT_MODEL = "best_openvino_model" if os.path.exists("best_openvino_model") else "best.pt"
 CAMERA_INDEX = 0
 TARGET_WIDTH, TARGET_HEIGHT = 1280, 720
