@@ -63,13 +63,29 @@ Optimal positioning depends on pendulum length:
 - Point the camera **perpendicular to the swing plane** and at **pivot height**.
 - Place the calibration ruler in the **same plane as the swing** — a ruler on a wall behind the pendulum introduces a scale error of approximately $\delta / D \times 100\%$ where $\delta$ is the depth offset and $D$ is the camera distance.
 
+### ⚠️ Calibration depth — the most common source of g error
+
+If g is consistently off by a **stable factor** (e.g. always 2× too high), the calibration reference is almost certainly at a different depth than the pendulum. The error propagates directly: a reference that is 50% further from the camera than the pendulum inflates every distance measurement by 50%, and g by the same factor.
+
+**Diagnosis:** check the `L` value printed when tracking starts. If it is larger than your physical string + ball radius, the reference is too far away.
+
+**Fixes (in order of preference):**
+
+1. **Same-plane reference** — tape a strip of paper with two marks (20 cm apart) directly to the wall or surface the string hangs from. The marks must be at the same depth as the ball's arc.
+2. **`--length` flag** — measure the pendulum physically (pivot to ball center = string length + ball radius ≈ +2 cm) and pass it directly:
+   ```bash
+   python pendulo_energia.py --length 20
+   ```
+   The HUD shows the L label in **green** (manual) or **red** (pixel-estimated) so you always know which is in use.
+3. **Period vs. length method** (`pendulo_periodo.py`) — uses the *slope* of T² vs L across multiple runs. Absolute L accuracy is irrelevant; only relative changes in L matter, so the depth offset cancels out.
+
 ## 📈 Experiments
 
 ### Calibration
 
 Two calibration methods are used depending on the experiment:
 
-- **Pendulum scripts** — 2-click line calibration: click both ends of a known reference (default 30 cm). Establishes a uniform px→cm scale.
+- **Pendulum scripts** — 2-click line calibration: click both ends of a known reference. Default reference length is 30 cm for most scripts and 20 cm for `pendulo_energia.py` / `pendulum_energy.py`. Establishes a uniform px→cm scale.
 - **Collision scripts** — 4-point perspective calibration: click the 4 corners of a known rectangle (default 40×20 cm). Corrects for camera angle and perspective.
 
 After calibration, click to set the pivot (pendulum) or begin tracking (collisions), then press **S** to start.
