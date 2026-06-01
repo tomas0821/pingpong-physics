@@ -31,6 +31,7 @@ energy_history = deque(maxlen=POINT_HISTORY_LENGTH)
 # Historial de ángulos para el ajuste polinomial: (t, angle_rad)
 angle_history = deque(maxlen=POINT_HISTORY_LENGTH)
 pendulum_length_cm = None
+manual_length_cm   = None   # set via --length; bypasses pixel-based estimation
 E0 = None
 
 
@@ -70,8 +71,10 @@ def fit_g_from_omega():
         A_fit       = float(popt[0])
         sigma_omega = float(np.sqrt(np.diag(pcov)[2]))
 
-        # Mejora 2: L robusto — mediana sobre todos los fotogramas capturados
-        if len(energy_history) >= 10 and pivot_point_cm is not None:
+        # L: manual si se proveyó --length, si no mediana sobre todos los fotogramas
+        if manual_length_cm is not None:
+            L_cm = manual_length_cm
+        elif len(energy_history) >= 10 and pivot_point_cm is not None:
             dists = [float(np.linalg.norm(np.array(e[0]) - np.array(pivot_point_cm)))
                      for e in energy_history]
             L_cm = float(np.median(dists))
@@ -117,16 +120,20 @@ def compute_energy(pos_cm, t):
     if pivot_point_cm is None or len(energy_history) < 2:
         return None
 
-    # Fijar la longitud del péndulo con las primeras 10 detecciones
+    # Fijar la longitud del péndulo
     if pendulum_length_cm is None:
-        if len(energy_history) < 10:
-            return None
-        L_samples = [
-            float(np.linalg.norm(entry[0] - np.array(pivot_point_cm)))
-            for entry in energy_history
-        ]
-        pendulum_length_cm = float(np.mean(L_samples))
-        print(f"Longitud del péndulo fijada: {pendulum_length_cm:.2f} cm")
+        if manual_length_cm is not None:
+            pendulum_length_cm = manual_length_cm
+            print(f"Longitud del péndulo (manual): {pendulum_length_cm:.2f} cm")
+        else:
+            if len(energy_history) < 10:
+                return None
+            L_samples = [
+                float(np.linalg.norm(entry[0] - np.array(pivot_point_cm)))
+                for entry in energy_history
+            ]
+            pendulum_length_cm = float(np.mean(L_samples))
+            print(f"Longitud del péndulo (estimada por píxeles): {pendulum_length_cm:.2f} cm")
 
     # Altura sobre el punto más bajo de la oscilación
     lowest_y = pivot_point_cm[1] + pendulum_length_cm
@@ -315,16 +322,15 @@ def run_energy(model_path):
             c_px, w_px = det_px
             cv2.circle(disp, c_px, max(5, int(w_px / 2)), (0, 255, 0), 2)
 
+        if pendulum_length_cm is not None:
+            src = "manual" if manual_length_cm is not None else "px"
+            cv2.putText(disp, f"L={pendulum_length_cm:.1f} cm ({src})", (10, 60),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
         if energy_history and energy_history[-1][6] > 0:
             last = energy_history[-1]
             v, h_cm, ec, ep, e = last[2], last[3], last[4], last[5], last[6]
-            retenida = (e / E0 * 100) if E0 and E0 > 0 else 0.0
-            cv2.putText(disp, f"v={v:.1f} cm/s  h={h_cm:.2f} cm", (10, 60),
+            cv2.putText(disp, f"v={v:.1f} cm/s  h={h_cm:.2f} cm", (10, 90),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-            cv2.putText(disp, f"EC/m={ec:.0f}  EP/m={ep:.0f}  E/m={e:.0f} cm2/s2", (10, 90),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-            cv2.putText(disp, f"E retenida: {retenida:.1f}%", (10, 120),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
 
         if not calib.is_calibrated():
             estado = "CALIBRAR"
@@ -372,6 +378,13 @@ def run_energy(model_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default=DEFAULT_MODEL)
+    parser.add_argument('--model',  type=str,   default=DEFAULT_MODEL)
+    parser.add_argument('--length', type=float, default=None,
+                        help='Longitud del péndulo en cm (pivote → centro de la pelota). '
+                             'Recomendado cuando la regla de calibración no está en el mismo '
+                             'plano que el péndulo.')
     args = parser.parse_args()
+    manual_length_cm = args.length
+    if manual_length_cm is not None:
+        print(f"Longitud manual: {manual_length_cm:.1f} cm")
     run_energy(args.model)
