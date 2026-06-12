@@ -260,7 +260,11 @@ def plot_energy(history):
                            f'  ω={omega_fit:.3f} rad/s  T={T_fit:.3f} s')
     ax1.set_ylabel('Ángulo θ  (grados)')
     ax1.set_title('Ajuste de Oscilación Amortiguada  θ(t) = A·e^{−βt}·cos(ωt+φ)')
-    ax1.legend(fontsize=8); ax1.grid()
+    ax1.legend(fontsize=8)
+    # Grid every 0.25 seconds for period measurement
+    t_max = t_ang[-1] if len(t_ang) > 0 else 0
+    ax1.set_xticks(np.arange(0, t_max + 0.25, 0.25), minor=False)
+    ax1.grid(True, which='major', linewidth=1.0, alpha=0.7)
 
     # --- Panel 2: EC y EP calculadas del ajuste ---
     g_ev = None   # resultado de varianza de energía, disponible para consola
@@ -314,11 +318,18 @@ def plot_energy(history):
             ax2.set_title(
                 f'g (ω²·L) = {g_om_val:.3f} ± {g_om_sig:.3f} m/s²  (err {pct_om:.1f}%)'
             )
-        ax2.legend(fontsize=8); ax2.grid()
+        ax2.legend(fontsize=8)
+        # Grid every 0.25 seconds for period measurement
+        ax2.set_xticks(np.arange(0, t_main_sm[-1] + 0.25, 0.25), minor=False)
+        ax2.grid(True, which='major', linewidth=1.0, alpha=0.7)
     else:
         ax2.text(0.5, 0.5, 'Ajuste no disponible.\nOscilar el péndulo al menos 3 ciclos completos.',
                  ha='center', va='center', transform=ax2.transAxes, fontsize=11)
         ax2.set_ylabel('Energía específica  (cm²/s²)')
+        # Grid every 0.25 seconds even when fit is unavailable
+        if len(t) > 0:
+            ax2.set_xticks(np.arange(0, t[-1] + 0.25, 0.25), minor=False)
+            ax2.grid(True, which='major', linewidth=1.0, alpha=0.7)
 
     ax2.set_xlabel('Tiempo (s)')
 
