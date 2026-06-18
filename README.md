@@ -142,16 +142,14 @@ Run `python pendulum_v2.py` (or `pendulo_v2.py` for Spanish).
 
 ### 3. Energy Conservation & g Extraction
 Run `python pendulum_energy.py` (or `pendulo_energia.py` for Spanish).
-*   **Calibration**: Click both ends of a 30 cm reference to set scale.
+*   **Calibration**: Click both ends of a 20 cm reference to set scale.
 *   **Setup**: Click to set the pivot point.
 *   **Velocity method**: At each frame, a degree-3 polynomial is fitted to the angle history of the current half-swing; the analytical derivative gives $\omega(t)$, then $v = L \cdot |\omega|$. This correctly forces $v \to 0$ at the turning points even at low frame rates.
-*   **Pendulum length**: Computed as the median pivot-to-ball distance over all collected frames (robust to outlier detections).
+*   **Pendulum length**: Computed as the median pivot-to-ball distance over all collected frames (robust to outlier detections). Pass `--length <L_cm>` to use a physical measurement instead — strongly recommended when the calibration ruler is not in the same plane as the pendulum swing (see ⚠️ above).
 *   **Physics**: Press **G** while paused to generate a 2-panel plot:
     1. **θ(t) fit** — raw angle data overlaid with $\theta(t) = A_0 e^{-\beta t} \cos(\omega t + \phi)$. Fit parameters ($A_0$, $\beta$, $\omega$, $T$) are shown in the legend.
-    2. **Energy from the fit** — KE/m = $\frac{1}{2}v^2$ and PE/m = $g \cdot h$ computed analytically from the fit, where $h = L(1 - \cos\theta)$ (exact formula). Gravitational acceleration is extracted as:
-    $$g = \omega^2 L \left(1 + \frac{A_0^2}{16}\right)^2$$
-    The correction factor $(1 + A_0^2/16)^2$ accounts for the period elongation at large amplitudes (~3% at 30°, ~8% at 45°). The measured $g$ and % error vs 9.81 m/s² appear in the panel title.
-*   **Output**: `conservacion_energia.pdf` and console summary of corrected $g$, raw $g$, correction factor, and % error.
+    2. **Energy from the fit** — KE/m = $\frac{1}{2}v^2$ and PE/m = $g \cdot h$ computed analytically from the fit, where $h = L(1 - \cos\theta)$ (exact formula). Gravitational acceleration is extracted by two independent methods: $\omega^2 L$ with large-angle correction $(1 + A_0^2/16)^2$, and energy-variance minimisation. Both results and their % error vs 9.81 m/s² appear in the panel title.
+*   **Output**: `energy_conservation.pdf` (`conservacion_energia.pdf` for Spanish) and console summary of corrected $g$, raw $g$, correction factor, and % error.
 
 ### 4. Period vs. Length
 Run `python pendulum_period.py` (or `pendulo_periodo.py` for Spanish).
