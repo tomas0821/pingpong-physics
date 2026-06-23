@@ -276,5 +276,11 @@ This tool is designed to bridge the gap between "Black Box" technology and funda
 2. **Check for input mode**: Calibration is active if you see "Click to set..." messages. Press **Esc** or click away to exit calibration.
 3. **Verify terminal output**: Check the terminal for error messages that might indicate a crash.
 
+## 📖 Citation
+
+If you use this software in your research, please cite the accompanying paper (citation details to be updated upon acceptance):
+
+> [Author] 2026 Real-time high-speed tracking of ping-pong balls for physics education using YOLOv11 *Phys. Educ.* (submitted)
+
 ## 📜 License
 MIT License
