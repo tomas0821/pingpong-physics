@@ -11,8 +11,9 @@ Comprehensive analysis of all physics experiments: 2025–2026
 | **Period vs Length (T²∝L method)** | 2025 | 2 locations | 7 | 18.8% | Bryan Hidalgo (0.2%) | ✅ Complete |
 | **Magnetic Damping** | 2025 | 2 cycles | 12 | — | Diego Atencio (exponential fit) | ✅ Complete |
 | **Math II Pendulum** | 2025 | Math II | 3 | 12.7% | Tirza Segura (6.4%) | ✅ Complete |
+| **Collisions & Momentum** | 2025 | — | 5 | — | Mesa 2 (90.1% P, e=0.722) | ✅ Complete |
 
-**Total student teams: 31** | **Total students: ~70** | **Data points: 5000+**
+**Total student teams: 36** | **Total students: ~84** | **Data points: 5000+**
 
 ---
 
@@ -97,7 +98,39 @@ Comprehensive analysis of all physics experiments: 2025–2026
 
 ---
 
-## 4. CONCEPTUAL UNDERSTANDING ACROSS ALL ACTIVITIES
+## 4. COLLISIONS & MOMENTUM — June 25, 2025
+
+### Results by Team
+
+| Team | Valid trials | Best P% | Best e | Ball type | Notes |
+|---|---|---|---|---|---|
+| **Mesa 2** ⭐⭐ | 3/4 | 90.1% | 0.722 | Amarilla | Best data quality |
+| **Mesa 4** ✅ | 3/4 | 86.0% | 0.406 | PingPong | Consistent |
+| **Mesa 1** ✅ | 2/4 | 84.1% | 0.317 | Amarilla/PP | One Amarilla false detection |
+| **Mesa 3** ✅ | 2/4 | 66.5% | 0.310 | PingPong | Golf data failed |
+| **Mesa 5** ❌ | 0/6 | — | — | — | Complete failure (pre-v ≈ 0) |
+
+### Ball Type Success Rate
+
+| Ball type | Valid trials | Avg P% | Avg e | Failure cause |
+|---|---|---|---|---|
+| **PingPong** (~2.8g) | 6/8 | 71.6% | 0.133 | — |
+| **Amarilla** (~10g) | 4/6 | 77.5% | 0.265 | False detections |
+| **Golf** (~46g) | **0/8** | — | — | Ball-identity swap |
+| **GolfHueca** | 0/0 | — | — | Not attempted |
+
+**Key findings:**
+- Trial success rate: 36% (10/28 valid trials) — well below pendulum experiments
+- Golf balls: 0% valid — equal-mass, visually identical balls cause tracker to swap identities during collision
+- Mesa 5: pre-collision velocity ≈ 0 (balls nearly stationary) — tracking failure before collision
+- Low e values (0.007–0.722) are systematic: 2D measurement misses vertical bounce, ball spin, and table friction between impact and velocity measurement
+- Best result: Mesa 2, Amarilla balls, try 2 — P = 90.1%, e = 0.722
+
+**See:** `COLLISION_PHYSICS_ANALYSIS.md` and `COLLISION_RESPONSES_ANALYSIS.md` for full detail.
+
+---
+
+## 6. CONCEPTUAL UNDERSTANDING ACROSS ALL ACTIVITIES
 
 ### Consistently Answered Correctly (90%+ of teams):
 ✅ Frequency doesn't depend on mass
@@ -117,7 +150,7 @@ Comprehensive analysis of all physics experiments: 2025–2026
 
 ---
 
-## 5. ERROR PATTERNS BY METHOD
+## 7. ERROR PATTERNS BY METHOD
 
 | Method | N teams | Avg Error | Median | Best | Worst | Pattern |
 |---|---|---|---|---|---|---|
@@ -125,10 +158,11 @@ Comprehensive analysis of all physics experiments: 2025–2026
 | **T²vsL (2025)** | 9 | 16.3% | 12.4% | 0.2% | 34.1% | More consistent, fewer outliers |
 | **Magnetic** | 12 | — | — | Qualitative | Qualitative | All understand mechanism |
 | **Math II** | 3 | 12.7% | 6.7% | 6.4% | 24.9% | Small sample, good precision |
+| **Collisions (2025)** | 5 | — | 73% P | 90.1% P | 0% (Mesa 5) | Ball-ID swap kills golf data; Mesa 5 failed |
 
 ---
 
-## 6. YEAR-OVER-YEAR IMPROVEMENT
+## 8. YEAR-OVER-YEAR IMPROVEMENT
 
 | Year | Method | Avg Error | Median | Quality Trend |
 |---|---|---|---|---|
@@ -140,7 +174,7 @@ Comprehensive analysis of all physics experiments: 2025–2026
 
 ---
 
-## 7. FORM RESPONSE STATUS
+## 9. FORM RESPONSE STATUS
 
 **Google Forms Found:**
 - ✅ "Prueba experimental Pendulo Energía - Tacares I 2026" (complete)
@@ -154,7 +188,7 @@ Comprehensive analysis of all physics experiments: 2025–2026
 
 ---
 
-## 8. Key Insights for Publication
+## 10. Key Insights for Publication
 
 ### ✅ Pedagogical Success:
 1. **Students understand physics concepts** — despite measurement errors, analysis shows solid grasp of ω=√(g/L), energy conservation, magnetic fields
@@ -173,7 +207,7 @@ Comprehensive analysis of all physics experiments: 2025–2026
 
 ---
 
-## 9. Recommendations for GitHub Issues
+## 11. Recommendations for GitHub Issues
 
 **High Priority:**
 1. Calibration depth tutorial with before/after examples (use Mesa 1&2 data)
